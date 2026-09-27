@@ -4,6 +4,29 @@ import { isSameMonth, isToday, localDayKey } from '../lib/format'
 import { supabase, supabaseConfigured, toAuthEmail } from '../lib/supabase'
 
 const STORAGE_KEY = 'qazilma-erp-demo-v1'
+// Remote ma'lumotlarning tezkor nusxasi: ilova birinchi ochilganda va bo'limga o'tganda
+// to'liq yuklashni kutmasin — cache'dan darhol ko'rsatamiz, yangi ma'lumot fon'da keladi.
+const REMOTE_CACHE_PREFIX = 'qazilma-erp-remote-v1:'
+const REMOTE_CACHE_MAX_AGE = 14 * 24 * 60 * 60 * 1000 // 14 kundan eski nusxa ishlatilmaydi
+const REMOTE_CACHE_FIELDS = ['users', 'roles', 'clients', 'materials', 'vehicles', 'trips', 'transactions', 'maintenanceReports', 'categories']
+const remoteCacheKey = (userId) => `${REMOTE_CACHE_PREFIX}${userId}`
+const readRemoteCache = (userId) => {
+  if (!userId || typeof localStorage === 'undefined') return null
+  try {
+    const snapshot = JSON.parse(localStorage.getItem(remoteCacheKey(userId)) || 'null')
+    if (snapshot?.version !== 1 || !Array.isArray(snapshot.users) || !Array.isArray(snapshot.roles)) return null
+    if (Date.now() - Number(snapshot.savedAt || 0) > REMOTE_CACHE_MAX_AGE) return null
+    return snapshot
+  } catch { return null }
+}
+const writeRemoteCache = (userId, snapshot) => {
+  if (!userId || typeof localStorage === 'undefined') return
+  try { localStorage.setItem(remoteCacheKey(userId), JSON.stringify(snapshot)) } catch { /* kvota to'lgan bo'lsa — cachesiz ishlayveramiz */ }
+}
+const clearRemoteCache = (userId) => {
+  if (!userId || typeof localStorage === 'undefined') return
+  try { localStorage.removeItem(remoteCacheKey(userId)) } catch { /* o'chirib bo'lmasa ham asosiy oqim buzilmaydi */ }
+}
 const makeId = (prefix = 'ID') => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 11)}`
 const roleMap = (roleId, roles) => roles.find((role) => role.id === roleId)
 // The server rounds a trip total with numeric round(x, 2); mirror it so the preview matches.
@@ -118,6 +141,7 @@ export const useQuarryStore = defineStore('quarry', {
       remoteMode: supabaseConfigured,
       ready: false,
       loading: false,
+      refreshing: false,
       session: null,
       authError: '',
       dataError: '',
@@ -333,6 +357,38 @@ export const useQuarryStore = defineStore('quarry', {
       this.remoteFinancialBalances = { cash: null, bank: null }
       this.loadedUserId = ''
     },
+    // Cache'dan darhol ko'rsatish: to'liq yuklash kutinmaydi, interfeys zudlikda ochiladi.
+    hydrateRemoteCache(userId) {
+      const snapshot = readRemoteCache(userId)
+      if (!snapshot) return false
+      for (const field of REMOTE_CACHE_FIELDS) this[field] = snapshot[field] ?? []
+      this.remoteClientBalances = snapshot.remoteClientBalances ?? {}
+      this.remoteFinancialBalances = snapshot.remoteFinancialBalances ?? { cash: null, bank: null }
+      this.loadedUserId = userId
+      return true
+    },
+    saveRemoteCache() {
+      if (!this.remoteMode) return
+      const userId = this.session?.user?.id
+      if (!userId || this.loadedUserId !== userId) return
+      const snapshot = {
+        version: 1,
+        savedAt: Date.now(),
+        remoteClientBalances: this.remoteClientBalances,
+        remoteFinancialBalances: this.remoteFinancialBalances,
+      }
+      for (const field of REMOTE_CACHE_FIELDS) snapshot[field] = this[field]
+      writeRemoteCache(userId, snapshot)
+    },
+    // Ekrani bloklamaydigan yangilash: cache'dagi ma'lumot ishlab turadi,
+    // serverdagi yangi nusxa fonda yuklanib, tayyor bo'lganda almashadi.
+    refreshInBackground() {
+      if (this.refreshing || !this.session?.user?.id) return
+      this.refreshing = true
+      Promise.resolve(this.loadRemoteData({ background: true }))
+        .catch((error) => console.warn('Fon yangilash amalga oshmadi:', error?.message))
+        .finally(() => { this.refreshing = false })
+    },
     async initialize() {
       if (!this.remoteMode) {
         this.ready = true
@@ -344,12 +400,16 @@ export const useQuarryStore = defineStore('quarry', {
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) throw error
         this.session = session
-        if (session) await this.loadRemoteData()
+        if (session) {
+          const hydrated = this.hydrateRemoteCache(session.user.id)
+          if (hydrated) this.refreshInBackground()
+          else await this.loadRemoteData()
+        }
         supabase.auth.onAuthStateChange((_event, nextSession) => {
           this.session = nextSession
           if (!nextSession) {
             this.resetRemoteState()
-          } else if (!this.loading && nextSession.user.id !== this.loadedUserId) {
+          } else if (!this.loading && !this.refreshing && nextSession.user.id !== this.loadedUserId) {
             setTimeout(() => this.loadRemoteData(), 0)
           }
         })
@@ -367,6 +427,11 @@ export const useQuarryStore = defineStore('quarry', {
       if (error) throw new Error(error.message === 'Invalid login credentials' ? 'Login yoki parol noto‘g‘ri.' : error.message)
       this.session = data.session
       this.authError = ''
+      // Oldin kirilgan hisob uchun cache bo'lsa — kirish ham darhol yakunlanadi.
+      if (this.hydrateRemoteCache(data.session.user.id)) {
+        this.refreshInBackground()
+        return
+      }
       this.loadedUserId = data.session.user.id
       try { await this.loadRemoteData() } catch (loadError) {
         this.loadedUserId = ''
@@ -376,7 +441,10 @@ export const useQuarryStore = defineStore('quarry', {
     async signOut() {
       if (this.realtimeChannel) await supabase.removeChannel(this.realtimeChannel)
       this.realtimeChannel = null
+      const previousUserId = this.session?.user?.id
       await supabase.auth.signOut()
+      // Umumiy qurilmada boshqa odam kirsa, avvalgi hisob ma'lumoti qolmasin.
+      clearRemoteCache(previousUserId)
       this.resetRemoteState()
       this.session = null
       this.authError = ''
@@ -388,20 +456,25 @@ export const useQuarryStore = defineStore('quarry', {
       this.activeUserId = userId
       this.persistDemo()
     },
-    async loadRemoteData() {
+    async loadRemoteData(options = {}) {
+      // background: ekrani bloklamaydigan yangilash — xato bo'lsa cache'dagi nusxa bilan ishlayveramiz.
+      const background = options.background === true
       if (!this.session?.user?.id) return
       this.loading = true
-      this.dataError = ''
-      this.dataWarnings = []
+      if (!background) {
+        this.dataError = ''
+        this.dataWarnings = []
+      }
       try {
-        const { data: profile, error: profileError } = await supabase.from('users').select('*').eq('id', this.session.user.id).single()
-        if (profileError) throw new Error(`Xodim profili topilmadi. Admin Supabase'da profil/lavozim biriktirsin. ${profileError.message}`)
-
-        const [rolesResult, permissionsResult, rolePermissionsResult] = await Promise.all([
+        // Profil, lavozim va ruxsatlar bir vaqtda olinadi: 3 ta ketma-ket to'lqin o'rniga 1 ta.
+        const [profileResult, rolesResult, permissionsResult, rolePermissionsResult] = await Promise.all([
+          supabase.from('users').select('*').eq('id', this.session.user.id).single(),
           supabase.from('roles').select('id,name,description,is_system'),
           supabase.from('permissions').select('id,key,label,group_name,description'),
           supabase.from('role_permissions').select('role_id,permission_id'),
         ])
+        const profile = profileResult.data
+        if (profileResult.error) throw new Error(`Xodim profili topilmadi. Admin Supabase'da profil/lavozim biriktirsin. ${profileResult.error.message}`)
         if (rolesResult.error) throw rolesResult.error
         if (permissionsResult.error) throw new Error(`Ruxsatlar ro‘yxatini o‘qib bo‘lmadi: ${permissionsResult.error.message}`)
         if (rolePermissionsResult.error) throw new Error(`Lavozim ruxsatlarini o‘qib bo‘lmadi: ${rolePermissionsResult.error.message}`)
@@ -479,7 +552,10 @@ export const useQuarryStore = defineStore('quarry', {
           if (row.payment_method === 'cash' || row.payment_method === 'bank') this.remoteFinancialBalances[row.payment_method] = Number(row.current_balance || 0)
         }
         this.dataWarnings = failed
+        this.dataError = ''
         this.loadedUserId = this.session.user.id
+        // Keyingi ochilishda to'liq yuklash kutmasin deb, yangi nusxani saqlab qo'yamiz.
+        this.saveRemoteCache()
 
         if (this.realtimeChannel) await supabase.removeChannel(this.realtimeChannel)
         const channel = supabase.channel('qazilma-operations-live')
@@ -510,6 +586,10 @@ export const useQuarryStore = defineStore('quarry', {
         }
         this.realtimeChannel = channel.subscribe()
       } catch (error) {
+        if (background) {
+          console.warn('Fon yangilash amalga oshmadi:', error?.message || error)
+          return
+        }
         this.dataError = error.message || 'Ma’lumotlarni yuklash imkoni bo‘lmadi.'
         throw error
       } finally {

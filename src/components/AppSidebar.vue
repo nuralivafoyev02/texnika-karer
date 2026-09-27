@@ -54,7 +54,7 @@ const groups = computed(() => {
         <span>{{ store.remoteMode ? 'Supabase bilan ulangan' : 'Demo ma’lumotlar rejimi' }}</span>
       </div> -->
       <div class="mt-0 flex items-center justify-center px-0.5 text-[10px] text-[#7f9f8a]">
-        <span class="text-center font-semibold">v1.0.0</span>
+        <span class="text-center font-semibold">v1.1.1</span>
       </div>
     </div>
   </aside>
