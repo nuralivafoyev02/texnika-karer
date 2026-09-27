@@ -23,6 +23,11 @@ const readFunctionError = async (name, error) => {
   if (error?.status === 404 || /not found/i.test(error?.message ?? '')) {
     return `${name} Edge Function deploy qilinmagan. Supabase CLI bilan: supabase functions deploy ${name}`
   }
+  // Fetch/CORS xatosi: javob o'qilmaydi, brauzer faqat "preflight ... HTTP ok status" yozadi.
+  // Asosiy sabab — funksiya deploy qilinmagan (shaffof 404) yoki tarmoq bloki.
+  if (error?.name === 'FunctionsFetchError' || /failed to send a request/i.test(error?.message ?? '')) {
+    return `${name} Edge Function javob bermadi (CORS yoki tarmoq xatosi). Supabase loyihasida deploy qilinganini tekshiring: supabase functions deploy ${name}`
+  }
   let detail = ''
   try { detail = String((await error?.context?.json())?.error ?? '') } catch { detail = '' }
   const message = detail || error?.message || 'Serverga ulanishda xatolik.'
