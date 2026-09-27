@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.env.emaple
+!.env.example
+.DS_Store
+DEPLOYMENT.md
