@@ -39,7 +39,7 @@ function submit() {
   <form @submit.prevent="submit">
     <div class="grid gap-4 sm:grid-cols-2">
       <label><span class="label">Texnika raqami</span><input v-model="form.plate" class="field uppercase" placeholder="01 B 123 KA" maxlength="16" autocomplete="off" spellcheck="false" required /></label>
-      <label><span class="label">Marka / model</span><input v-model="form.model" class="field" placeholder="MAN TGS 6x4" required /></label>
+      <label><span class="label">Model</span><input v-model="form.model" class="field" placeholder="MAN TGS 6x4" required /></label>
       <label><span class="label">Ilojiy yili</span><input v-model="form.year" class="field" type="number" min="1950" :max="new Date().getFullYear() + 1" placeholder="2021" /></label>
       <label><span class="label">Holati</span><select v-model="form.status" class="field"><option value="active">Faol — reys ochish mumkin</option><option value="service">Servisda</option><option value="repair">Remontda</option></select></label>
       <label class="sm:col-span-2">

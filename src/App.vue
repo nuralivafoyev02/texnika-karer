@@ -11,7 +11,7 @@ const showAuth = computed(() => store.remoteMode && (!store.session || !store.cu
 <template>
   <div v-if="!store.ready" class="loading-screen">
     <div class="brand-mark brand-mark-large"><span></span><span></span><span></span></div>
-    <p>Texnika tizimi yuklanmoqda</p>
+    <p>AliBuilding tizimi yuklanmoqda</p>
     <div class="loading-track"><span></span></div>
   </div>
   <AuthView v-else-if="showAuth" />

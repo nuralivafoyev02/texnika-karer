@@ -63,7 +63,7 @@ function submit() {
       <template v-else>
         <label class="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 hover:bg-canvas">
           <input v-model="form.needsVehicle" type="checkbox" class="mt-0.5 h-4 w-4 accent-[#2a7650]" />
-          <span class="min-w-0"><span class="flex items-center gap-1.5 text-xs font-semibold text-ink"><Truck :size="13" /> Texnika maydoni</span><span class="mt-0.5 block text-[10px] leading-4 text-muted">Xarajat formasida samosval tanlash maydoni ochiladi.</span></span>
+          <span class="min-w-0"><span class="flex items-center gap-1.5 text-xs font-semibold text-ink"><Truck :size="13" /> Texnika maydoni</span><span class="mt-0.5 block text-[10px] leading-4 text-muted">Xarajat formasida texnika tanlash maydoni ochiladi.</span></span>
         </label>
         <label class="flex cursor-pointer items-start gap-3 rounded-lg px-2 py-2 hover:bg-canvas">
           <input v-model="form.needsDriver" type="checkbox" class="mt-0.5 h-4 w-4 accent-[#2a7650]" />

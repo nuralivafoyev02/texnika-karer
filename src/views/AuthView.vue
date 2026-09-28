@@ -33,7 +33,7 @@ async function submit() {
   <main class="flex min-h-screen bg-white">
     <section class="relative hidden w-[48%] flex-col justify-between overflow-hidden bg-[#153c2b] p-12 text-white lg:flex">
       <div class="absolute -right-24 -top-28 h-[420px] w-[420px] rounded-full border border-white/10"></div><div class="absolute -right-8 -top-12 h-[290px] w-[290px] rounded-full border border-white/10"></div>
-      <div class="relative z-10 flex items-center gap-3"><div class="brand-mark"><span></span><span></span><span></span></div><div class="brand-copy"><strong>Texnika<span style="color:#9fd1ac">.</span></strong><small>KARER BOSHQARUVI</small></div></div>
+      <div class="relative z-10 flex items-center gap-3"><div class="brand-mark"><span></span><span></span><span></span></div><div class="brand-copy"><strong>AliBuilding<span style="color:#9fd1ac">.</span></strong><small>KARER BOSHQARUVI</small></div></div>
       <div class="relative z-10 max-w-[490px]">
         <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.15em] text-[#bed8c6]"><ShieldCheck :size="14" /> Boshqaruv bir joyda</div>
         <h1 class="text-[42px] font-semibold leading-[1.12] tracking-[-.045em]">Karer ishini<br><span class="text-[#9fd1ac]">aniq nazorat</span> qiling.</h1>
