@@ -64,17 +64,12 @@ where u.id in (
 alter table public.users drop constraint if exists users_login_format;
 alter table public.users add constraint users_login_format check (login ~ '^[a-z0-9][a-z0-9._-]{2,31}$');
 create unique index if not exists users_login_key on public.users(login) where login is not null;
--- At most one superadmin can ever exist: full access is a single account by design.
--- At most one superadmin can ever exist: full access is a single account by design.
--- Tozalash avval bajariladi, aks holda eski indeks allaqachon mavjud bo'lsa CREATE xato beradi.
-do $$
-begin
-  if (select count(*) from public.users where is_superadmin) > 1 then
-    update public.users set is_superadmin = false
-    where id not in (select id from public.users where is_superadmin order by created_at limit 1);
-  end if;
-end $$;
-create unique index if not exists users_single_superadmin on public.users (is_superadmin) where is_superadmin;
+-- ── Superadmin = to'liq dostup ──────────────────────────────────────────────
+-- Eski cheklov: `users_single_superadmin` unique indeksi faqat BITTA superadmin'ga ruxsat berardi,
+-- shuning uchun "Boshliq" lavozimini olgan yangi xodim ham boshqaruvga chiqmay qolardi.
+-- Endi to'g'ri qoida: lavozimdagi barcha ruxsat kalitlari bor bo'lsa, xodim superadmin hisoblanadi
+-- (role_has_full_access, quyida) va superadminlar soni cheklanmaydi.
+drop index if exists public.users_single_superadmin;
 
 -- Eski "taklif xati" oqimi qo'ygan auth trigger'lari profilni o'zlari yaratardi va
 -- role_id (not null) tufayli har bir yangi xodim yaratilishini "Database error saving new user"
@@ -110,10 +105,12 @@ insert into public.permissions (key, label, group_name, description) values
   ('finance.expenses.create', 'Xarajat kiritish', 'Moliya', 'Karer xarajatlari va ish haqi to‘lovi'),
   ('payroll.manage', 'Oylik va stavkani boshqarish', 'Xodimlar', 'Reys stavkasi va haydovchi avanslari'),
   ('staff.view', 'Xodimlarni ko‘rish', 'Xodimlar', 'Xodimlar va haydovchilar ro‘yxati'),
-  ('staff.manage', 'Xodim qo‘shish', 'Xodimlar', 'Xodim qo‘shish va login/parol berish (faqat superadmin)'),
-  ('roles.manage', 'Lavozim va ruxsatlarni sozlash', 'Sozlamalar', 'Dinamik RBAC lavozimlari va huquqlari (faqat superadmin)'),
-  ('materials.manage', 'Mahsulotlarni boshqarish', 'Sozlamalar', 'Mahsulot qo‘shish, narxi va o‘chirish'),
-  ('finance.manage', 'Moliya turlarini boshqarish', 'Sozlamalar', 'Daromat va xarajat turlarini yaratish'),
+  ('staff.manage', 'Xodim qo‘shish', 'Xodimlar', 'Xodim qo‘shish va login/parol berish (faqat to‘liq huquqli — superadmin)'),
+  ('roles.manage', 'Lavozim va ruxsatlarni sozlash', 'Sozlamalar', 'Dinamik RBAC lavozimlari va huquqlari (faqat to‘liq huquqli — superadmin)'),
+  ('materials.create', 'Mahsulot qo‘shish', 'Sozlamalar', 'Yangi tosh turi va tonna narxini kiritish'),
+  ('materials.manage', 'Mahsulotlarni boshqarish', 'Sozlamalar', 'Mahsulot narxi, faolligi va o‘chirish (qo‘shishdan tashqari)'),
+  ('finance.categories.create', 'Moliya turi qo‘shish', 'Sozlamalar', 'Yangi daromat yoki xarajat turini yaratish'),
+  ('finance.manage', 'Moliya turlarini boshqarish', 'Sozlamalar', 'Moliya turlarini tahrirlash va o‘chirish (qo‘shishdan tashqari)'),
   ('driver.self', 'Shaxsiy haydovchi kabineti', 'Haydovchi', 'Faqat o‘z reyslari, maoshi va xabarlari'),
   ('maintenance.report', 'Nosozlik haqida xabar berish', 'Texnika', 'Texnika bo‘yicha tezkor xabar yuborish')
 on conflict (key) do update set label = excluded.label, group_name = excluded.group_name, description = excluded.description;
@@ -362,6 +359,9 @@ alter table public.transactions drop constraint if exists transactions_category_
 alter table public.transactions drop constraint if exists transaction_direction_category_check;
 alter table public.transactions drop constraint if exists customer_payment_client_check;
 alter table public.transactions drop constraint if exists payroll_driver_check;
+-- drop ... if exists addimida bo'lishi shart: aks holda fayl ikkinchi marta ishga tushganda
+-- 42710 "constraint ... already exists" xatosi chiqadi va skript to'xtaydi.
+alter table public.transactions drop constraint if exists transactions_category_format_check;
 alter table public.transactions add constraint transactions_category_format_check check (category ~ '^[a-z][a-z0-9_]{1,39}$');
 -- O'zgaruvchan CHECK Postgres'da mumkin emas, shuning uchun trigger ishlatiladi.
 create or replace function public.validate_transaction_category()
@@ -530,9 +530,36 @@ as $$
   );
 $$;
 
--- ── Single superadmin ──────────────────────────────────────────────────────
--- To'liq huquq bitta hisobga beriladi: faqat is_superadmin = true bo'lgan foydalanuvchi
--- xodim qo'sha, login/parol o'zgartira, lavozim va ruxsatlarni boshqara oladi.
+-- ── To'liq dostup = superadmin ──────────────────────────────────────────────
+-- "Superadmin" — alohida belgilanadigan maxfiy lavozim emas, balki xodimning lavozimida
+-- ruxsat katalogidagi BARCHA kalitlar mavjud bo'lgan holat. Shu tarzda xodim yaratilib
+-- unga to'liq huquq berilganda u darhol boshqaruvga kiradi: xodim qo'shadi, login/parol
+-- beradi, lavozim va ruxsatlarni boshqaradi. Superadminlar soni cheklanmaydi.
+create or replace function public.role_has_full_access(p_role_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  -- Katalog bo'sh bo'lsa hech kim to'liq dostubga ega emas (aksi holda trigger har yozuvni
+  -- superadmin qilib qo'yardi).
+  select exists (select 1 from public.permissions)
+     and not exists (
+       select 1
+       from public.permissions p
+       where not exists (
+         select 1 from public.role_permissions rp
+         where rp.role_id = p_role_id and rp.permission_id = p.id
+       )
+     );
+$$;
+revoke all on function public.role_has_full_access(uuid) from public;
+grant execute on function public.role_has_full_access(uuid) to authenticated;
+
+-- users.is_superadmin — saqlangan natija. Triggerlar uni lavozim ruxsatlari bilan sinxron qiladi,
+-- shuning uchun "full dostup berildi" degani darhol ishlaydi. is_superadmin() esa ustunga
+-- role_has_full_access() ni qo'shib, eski sxema qoldirilgan holatda ham to'g'ri javob beradi.
 create or replace function public.is_superadmin()
 returns boolean
 language sql
@@ -541,19 +568,71 @@ security definer
 set search_path = public
 as $$
   select coalesce(
-    (select u.is_superadmin from public.users u where u.id = auth.uid() and u.is_active),
+    (select u.is_superadmin or public.role_has_full_access(u.role_id)
+       from public.users u where u.id = auth.uid() and u.is_active),
     false
   );
 $$;
 revoke all on function public.is_superadmin() from public;
 grant execute on function public.is_superadmin() to authenticated;
 
+-- Xodim yaratilganda yoki lavozimi o'zgarganda full-dostub belgisini qayta hisoblaymiz.
+create or replace function public.sync_user_superadmin()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.is_superadmin := public.role_has_full_access(new.role_id);
+  return new;
+end;
+$$;
+drop trigger if exists users_sync_superadmin on public.users;
+create trigger users_sync_superadmin
+  before insert or update of role_id on public.users
+  for each row execute function public.sync_user_superadmin();
+
+-- Aksincha: lavozimga ruxsat qo'shilib/olib tashlansa, o'sha lavozimdagi xodimlarning
+-- belgisi darhol yangilanadi — superadmin rolini faqat reload'da emas, o'sha zahoti yo'qolmaydi.
+create or replace function public.sync_role_superadmins()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_role uuid;
+  full_access boolean;
+begin
+  -- Muhim: PL/pgSQL'da INSERT trigger'ida OLD, DELETE trigger'ida NEW "not assigned"
+  -- deb hisoblanadi — coalesce(new.role_id, old.role_id) yozsa bitta holatda ham xato beradi.
+  -- Shuning uchun TG_OP orqali aniq ajratamiz.
+  if tg_op = 'DELETE' then
+    target_role := old.role_id;
+  else
+    target_role := new.role_id;
+  end if;
+  if target_role is null then return null; end if;
+  full_access := public.role_has_full_access(target_role);
+  update public.users u set is_superadmin = full_access
+  where u.role_id = target_role and u.is_superadmin is distinct from full_access;
+  return null;
+end;
+$$;
+drop trigger if exists role_permissions_sync_superadmins on public.role_permissions;
+create trigger role_permissions_sync_superadmins
+  after insert or delete on public.role_permissions
+  for each row execute function public.sync_role_superadmins();
+
 -- Xodimlar ro'yxati (ism, login, telefon, lavozim) — ismlar jamiada ko'rinishi uchun
 -- ochiq, ammo reys stavkasi faqat o'z egasi va xodimlar bo'limiga ko'rinadi.
 -- View ataylab security definer (standart) qilingan: public.users dagi RLS bu yerda
 -- ishlamaydi, aynan shuning uchun faqat kerakli ustunlar chiqariladi.
+-- is_superadmin — samaraviy qiymat (trigger ishlamagan holat uchun ham qayta hisoblanadi).
 create or replace view public.staff_directory as
-select u.id, u.login, u.full_name, u.email, u.phone, u.title, u.role_id, u.is_active, u.is_superadmin,
+select u.id, u.login, u.full_name, u.email, u.phone, u.title, u.role_id, u.is_active,
+  (u.is_superadmin or public.role_has_full_access(u.role_id)) as is_superadmin,
   case when u.id = auth.uid() or public.has_permission('staff.view') or public.is_superadmin()
     then u.driver_rate_per_trip else 0 end as driver_rate_per_trip
 from public.users u
@@ -658,7 +737,8 @@ alter table public.maintenance_reports enable row level security;
 -- Role catalog is visible to signed-in staff so the UI can resolve their own permissions.
 drop policy if exists roles_read_authenticated on public.roles;
 create policy roles_read_authenticated on public.roles for select to authenticated using (true);
--- Only the single superadmin account may manage roles and permissions.
+-- To'liq huquqga ega (superadmin) xodim lavozim va ruxsatlarni boshqaradi. Boshqa hech kim,
+-- roli qanchalik kuchli bo'lmasin — chunki is_superadmin() aynan "barcha ruxsatlarga ega" holatni tekshiradi.
 drop policy if exists roles_insert_manage on public.roles;
 create policy roles_insert_manage on public.roles for insert to authenticated with check (public.is_superadmin() and is_system = false);
 drop policy if exists roles_update_manage on public.roles;
@@ -692,8 +772,11 @@ drop policy if exists materials_read on public.materials;
 create policy materials_read on public.materials for select to authenticated using (true);
 drop policy if exists materials_update on public.materials;
 create policy materials_update on public.materials for update to authenticated using (public.has_permission('materials.manage')) with check (public.has_permission('materials.manage'));
+-- Mahsulot qo'shish — alohida materials.create ruxsati bilan. Superadmin yoki boshqaruvchi
+-- kabi to'liq manage huquqiga egalar ham shu siyosat orqali qo'sha oladi.
 drop policy if exists materials_insert_manage on public.materials;
-create policy materials_insert_manage on public.materials for insert to authenticated with check (public.has_permission('materials.manage'));
+create policy materials_insert_manage on public.materials for insert to authenticated
+  with check (public.has_permission('materials.manage') or public.has_permission('materials.create'));
 -- Mahsulotni o'chirish faqat undan foydalanilmagan bo'lsa mumkin: trips.material_id
 -- "on delete restrict" bilan bog'langan, shuning uchun DB ham bloklaydi.
 drop policy if exists materials_delete_manage on public.materials;
@@ -702,12 +785,19 @@ create policy materials_delete_manage on public.materials for delete to authenti
 drop policy if exists transaction_categories_read on public.transaction_categories;
 create policy transaction_categories_read on public.transaction_categories for select to authenticated using (
   public.has_permission('finance.view') or public.has_permission('finance.manage') or
+  public.has_permission('finance.categories.create') or
   public.has_permission('finance.payments.create') or
   public.has_permission('finance.expenses.create') or public.has_permission('dashboard.view')
 );
+-- Tahrirlash va o'chirish faqat finance.manage egalarida. Yangi tur yaratish esa
+-- finance.categories.create ruxsati bilan ham mumkin — shu bilan "faqat kiritish" vazifasi
+-- berilgan xodim superadminga murojaat qilmasdan o'z turini yarata oladi.
 drop policy if exists transaction_categories_manage on public.transaction_categories;
 create policy transaction_categories_manage on public.transaction_categories for all to authenticated
-using (public.has_permission('finance.manage')) with check (public.has_permission('finance.manage'));
+  using (public.has_permission('finance.manage')) with check (public.has_permission('finance.manage'));
+drop policy if exists transaction_categories_insert on public.transaction_categories;
+create policy transaction_categories_insert on public.transaction_categories for insert to authenticated
+  with check (public.has_permission('finance.manage') or public.has_permission('finance.categories.create'));
 
 drop policy if exists vehicles_read on public.vehicles;
 create policy vehicles_read on public.vehicles for select to authenticated using (
@@ -805,6 +895,10 @@ grant select on public.roles, public.permissions, public.role_permissions to aut
 grant insert, update, delete on public.roles to authenticated;
 revoke insert, update, delete on public.role_permissions from authenticated;
 grant select on public.users to authenticated;
+-- Profil tahrirlash (ism, telefon, bo'lim, lavozim, holat) faqat users_update_staff siyosati
+-- orqali — ya'ni to'liq huquqli xodim uchun. Ustun darajasida berish butun jadvalni
+-- ochmasligimiz uchun kerak: is_superadmin va driver_rate_per_trip o'zga tegishli RPC/tablolar orqali.
+grant update (full_name, phone, title, role_id, is_active) on public.users to authenticated;
 grant select, insert, update on public.clients to authenticated;
 grant select on public.materials to authenticated;
 grant insert on public.materials to authenticated;
@@ -819,6 +913,14 @@ grant select, insert, update, delete on public.transaction_categories to authent
 grant select on public.client_balances, public.financial_balances to authenticated;
 grant select, insert on public.maintenance_reports to authenticated;
 grant update (status, resolved_at) on public.maintenance_reports to authenticated;
+
+-- ── Full-dostub belgisini qayta hisoblash ───────────────────────────────────
+-- Triggerlar faqat keyingi o'zgarishlarda ishlaydi; shuning uchun mavjud xodimlar uchun
+-- bir marta to'liq qayta hisoblaymiz. Shu bilan eng muhimi: yangi ruxsat kaliti qo'shilsa
+-- yoki "Boshliq"ga biror ruxsat berilsa, o'sha lavozimdagi xodimlar superadmin bo'lib qoladi.
+update public.users u
+set is_superadmin = public.role_has_full_access(u.role_id)
+where u.is_superadmin is distinct from public.role_has_full_access(u.role_id);
 
 -- Add the operational tables to Realtime when the standard Supabase publication exists.
 -- RLS still filters the rows/events received by each user.

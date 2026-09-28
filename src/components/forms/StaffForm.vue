@@ -1,8 +1,9 @@
 <script setup>
 import { reactive, ref, computed, watch } from 'vue'
-import { Info, KeyRound, RefreshCw, Eye, EyeOff, Copy } from 'lucide-vue-next'
+import { Info, KeyRound, RefreshCw, Eye, EyeOff, Copy, ShieldCheck } from 'lucide-vue-next'
 import FormActions from './FormActions.vue'
 import { INTERNAL_DOMAIN } from '../../lib/supabase'
+import { useQuarryStore } from '../../stores/quarry'
 import { formatAmountInput, parseAmountInput, captureAmountInput } from '../../lib/format'
 
 const props = defineProps({
@@ -23,6 +24,11 @@ const error = ref('')
 const onRate = (event) => captureAmountInput(event, (value) => { form.driverRatePerTrip = value })
 const showPassword = ref(false)
 const selectedRole = computed(() => props.roles.find((role) => role.id === form.roleId))
+// To'liq dostubli xodimlarni boshqa superadminlar tahrirlashi mumkin. Faqat o'zini o'zi
+// bloklamaslik uchun maydonlar o'z profilida yopiladi.
+const store = useQuarryStore()
+const isSelf = computed(() => Boolean(props.user) && props.user?.id === store.currentUser?.id)
+const grantsFullAccess = computed(() => Boolean(form.roleId) && store.roleHasFullAccess(form.roleId))
 watch(() => props.roles, (roles) => {
   if (isEdit.value || form.roleId || !roles.length) return
   const preferred = roles.find((role) => role.id === props.initialRoleId)
@@ -95,9 +101,11 @@ function submit() {
       </label>
       <label><span class="label">Telefon</span><input v-model="form.phone" class="field" type="tel" placeholder="+998 90 000 00 00" /></label>
       <label><span class="label">Lavozim bo‘limi</span><input v-model="form.title" class="field" :placeholder="selectedRole?.name || 'Masalan: qurilma bo‘limi boshlig‘i'" /></label>
-      <label class="sm:col-span-2"><span class="label">Lavozim (ruxsatlar shundan kelib chiqadi)</span><select v-model="form.roleId" class="field" required :disabled="isEdit && user?.isSuperadmin"><option value="" disabled>Lavozimni tanlang</option><option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option></select></label>
+      <label class="sm:col-span-2"><span class="label">Lavozim (ruxsatlar shundan kelib chiqadi)</span><select v-model="form.roleId" class="field" required :disabled="isSelf"><option value="" disabled>Lavozimni tanlang</option><option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option></select>
+        <span v-if="grantsFullAccess" class="mt-1 flex items-center gap-1 text-[10px] font-semibold text-[#b77824]"><ShieldCheck :size="11" /> Bu lavozim to‘liq huquqli: xodim superadmin bo‘ladi va xodim/lavozim boshqarishiga kiradi.</span>
+      </label>
       <label v-if="selectedRole?.permissions?.includes('driver.self') || parseAmountInput(form.driverRatePerTrip) > 0" class="sm:col-span-2"><span class="label">Bir reys uchun haq</span><div class="relative"><input :value="form.driverRatePerTrip" type="text" inputmode="numeric" autocomplete="off" class="field pr-16" @input="onRate"><span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">so‘m / reys</span></div></label>
-      <label v-if="isEdit" class="sm:col-span-2"><span class="label">Holati</span><select v-model="form.isActive" class="field" :disabled="user?.isSuperadmin"><option :value="true">Faol — tizimga kirishi mumkin</option><option :value="false">Faol emas — kirish bloklanadi</option></select><span v-if="user?.isSuperadmin" class="mt-1 block text-[10px] text-muted">Superadmin hisobi faol holatda qolishi shart.</span></label>
+      <label v-if="isEdit" class="sm:col-span-2"><span class="label">Holati</span><select v-model="form.isActive" class="field" :disabled="isSelf"><option :value="true">Faol — tizimga kirishi mumkin</option><option :value="false">Faol emas — kirish bloklanadi</option></select><span v-if="isSelf" class="mt-1 block text-[10px] text-muted">O‘z hisobingiz holatini o‘zgartirib bo‘lmaydi.</span></label>
     </div>
     <div class="mt-4 flex gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-[11px] leading-4 text-blue-800">
       <Info :size="15" class="mt-0.5 shrink-0" />

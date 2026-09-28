@@ -33,10 +33,25 @@ export const generatePassword = (length = 11) => {
   return Array.from(bytes, (byte) => ALPHABET[byte % ALPHABET.length]).join('')
 }
 
-type Caller = { id: string; roleId: string; roleName: string }
+type Caller = { id: string; roleId: string; roleName: string; isSuperadmin: boolean }
 
-// Faqat bitta admin (superadmin) xodim qo'sha, login/parol o'zgartira, lavozim va
-// ruxsatlarni boshqara oladi — boshqa hech kim, roli qanchalik kuchli bo'lmasin.
+// ── To'liq dostugni aniqlash ────────────────────────────────────────────────
+// Superadmin — maxfiy lavozim emas: lavozimda ruxsat katalogidagi BARCHA kalitlar bor bo'lgan
+// xodim. Shu sabab bazadagi role_has_full_access() bilan bir xil qoida bu yerga ko'chiriladi,
+// ya'ni sxema triggerlari ishlamagan holatda ham to'g'ri javob keladi.
+export const permissionKeysForRole = async (admin: ReturnType<typeof createClient>, roleId: string) => {
+  const [{ data: links }, { data: catalog }] = await Promise.all([
+    admin.from('role_permissions').select('permission_id').eq('role_id', roleId),
+    admin.from('permissions').select('id,key'),
+  ])
+  const keyById = new Map((catalog ?? []).map((row) => [row.id, row.key]))
+  const keys = new Set((links ?? []).map((row) => keyById.get(row.permission_id)).filter(Boolean) as string[])
+  const all = (catalog ?? []).map((row) => row.key)
+  // Katalog bo'sh bo'lsa hech kim to'liq dostubga ega deb hisoblanmasin.
+  return { keys, fullAccess: all.length > 0 && all.every((key) => keys.has(key)) }
+}
+// To'liq huquqli xodim xodim qo'sha, login/parol o'zgartira, lavozim va ruxsatlarni boshqara
+// oladi. Boshqa hech kim, roli qanchalik kuchli bo'lmasin.
 export const requireSuperadmin = async (request: Request): Promise<Caller | Response> => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
@@ -63,10 +78,13 @@ export const requireSuperadmin = async (request: Request): Promise<Caller | Resp
   }
   if (!profile) return json({ error: 'Xodim profili topilmadi.' }, 403)
   if (!profile.is_active) return json({ error: 'Hisobingiz faol emas. Administratorga murojaat qiling.' }, 403)
-  if (!profile.is_superadmin) return json({ error: 'Bu amalni faqat superadmin bajarishi mumkin.' }, 403)
+
+  const { fullAccess } = await permissionKeysForRole(admin, profile.role_id)
+  const isSuperadmin = profile.is_superadmin === true || fullAccess
+  if (!isSuperadmin) return json({ error: 'Bu amalni faqat to‘liq huquqli (superadmin) xodim bajarishi mumkin.' }, 403)
 
   const { data: role } = await admin.from('roles').select('id,name').eq('id', profile.role_id).single()
-  return { id: profile.id, roleId: profile.role_id, roleName: role?.name ?? '' }
+  return { id: profile.id, roleId: profile.role_id, roleName: role?.name ?? '', isSuperadmin }
 }
 
 export const serviceClient = () => createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {

@@ -93,13 +93,13 @@ async function logout() {
       <div class="relative">
         <button class="flex items-center gap-2 rounded-xl px-1.5 py-1 transition hover:bg-canvas" @click="showUsers = !showUsers; showAlerts = false">
           <div class="avatar avatar-small">{{ initials(store.currentUser?.fullName) }}</div>
-          <div class="hidden text-left sm:block"><p class="max-w-[125px] truncate text-xs font-bold text-ink">{{ store.currentUser?.fullName }}</p><p class="mt-0.5 max-w-[125px] truncate text-[10px] text-muted">{{ store.currentUser?.isSuperadmin ? 'Superadmin' : store.currentRole?.name }}</p></div>
+          <div class="hidden text-left sm:block"><p class="max-w-[125px] truncate text-xs font-bold text-ink">{{ store.currentUser?.fullName }}</p><p class="mt-0.5 max-w-[125px] truncate text-[10px] text-muted">{{ store.isSuperadmin() ? 'Superadmin' : store.currentRole?.name }}</p></div>
           <ChevronDown :size="14" class="hidden text-slate-400 sm:block" />
         </button>
         <Transition name="fade">
           <div v-if="showUsers" class="header-menu !w-[286px]">
             <div class="header-menu-title"><span>{{ store.remoteMode ? 'Hisob' : 'Demo foydalanuvchi' }}</span><span v-if="!store.remoteMode" class="tag tag-blue">Rolni sinash</span></div>
-            <div v-if="store.remoteMode" class="flex items-center gap-2.5 border-b border-line px-1 py-2.5"><div class="avatar avatar-small">{{ initials(store.currentUser?.fullName) }}</div><div class="min-w-0 flex-1"><p class="truncate text-xs font-bold">{{ store.currentUser?.fullName }}</p><p class="text-[10px] text-muted">{{ store.currentUser?.login }} · {{ store.currentRole?.name }}</p></div><span v-if="store.currentUser?.isSuperadmin" class="rounded bg-[#fff4e3] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#b77824]">super</span></div>
+            <div v-if="store.remoteMode" class="flex items-center gap-2.5 border-b border-line px-1 py-2.5"><div class="avatar avatar-small">{{ initials(store.currentUser?.fullName) }}</div><div class="min-w-0 flex-1"><p class="truncate text-xs font-bold">{{ store.currentUser?.fullName }}</p><p class="text-[10px] text-muted">{{ store.currentUser?.login }} · {{ store.currentRole?.name }}</p></div><span v-if="store.isSuperadmin()" class="rounded bg-[#fff4e3] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#b77824]">super</span></div>
             <div v-if="!store.remoteMode" class="max-h-[350px] overflow-y-auto pt-1">
               <button v-for="user in userOptions" :key="user.id" class="header-menu-item" :class="store.currentUser?.id === user.id ? 'bg-mint/60' : ''" @click="selectUser(user)">
                 <div class="avatar avatar-small" :class="store.userCan(user, 'driver.self') ? 'avatar-driver' : ''">{{ initials(user.fullName) }}</div>

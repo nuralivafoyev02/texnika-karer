@@ -1,4 +1,4 @@
--- Texnika ERP · yagona superadmin hisobini yaratish
+-- Texnika ERP · dastlabki superadmin hisobini yaratish
 -- Supabase SQL Editor’da BIR MARTA ishga tushiring (idempotent: qayta ishga tushirilsa ham xato bermaydi).
 --
 --   login:    karersuperadmin
@@ -7,6 +7,11 @@
 -- Bu skript Auth hisobini ham, ERP profilini ham yaratadi. Parol `crypt(..., gen_salt('bf'))`
 -- orqali bcrypt hash'iga aylantiriladi — boshqa hech qaerda ochiq parol saqlanmaydi.
 -- Eslatma: ishga tushirgandan keyin bu parolni darhol o'zgartiring (Xodimlar → o'z parolini yangilang).
+--
+-- DIQQAT: bu skript faqat dastlabki hisobni yaratadi. Keyinchalik to‘liq huquqli (superadmin)
+-- xodimlar cheklanmaydi: Xodimlar → "Xodim qo‘shish" orqali "Boshliq" lavozimini berish yetarli,
+-- chunki to‘liq dostub = superadmin (bazadagi role_has_full_access va users_sync_superadmin
+-- triggeri shuni avtomatik belgilaydi).
 
 -- ── 1. Auth foydalanuvchisi (agar `karersuperadmin@karer.erp` yo'q bo'lsa) ─────
 insert into auth.users (

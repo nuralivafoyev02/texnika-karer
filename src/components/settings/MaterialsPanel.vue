@@ -1,10 +1,12 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { Package, Plus, Trash2, Check, ShieldCheck } from 'lucide-vue-next'
 import { useQuarryStore } from '../../stores/quarry'
-import { formatAmountInput, parseAmountInput, captureAmountInput } from '../../lib/format'
+import { formatAmountInput, parseAmountInput, captureAmountInput, money } from '../../lib/format'
 
 const store = useQuarryStore()
+// materials.create — faqat qo'shish formasi; materials.manage — narx, faollik va o'chirish.
+const canManage = computed(() => store.can('materials.manage'))
 const addForm = reactive({ name: '', unitPrice: '' })
 const priceDraft = reactive({})
 const saving = ref(false)
@@ -45,6 +47,12 @@ async function removeMaterial(material) {
         <div class="grid h-9 w-9 place-items-center rounded-xl bg-mint text-leaf"><Package :size="17" /></div>
       </div>
 
+      <div v-if="!canManage" class="flex items-start gap-2 border-b border-line bg-[#fbfcfb] px-5 py-3 text-[10px] leading-4 text-muted">
+        <span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-leaf"></span>
+        Sizga faqat mahsulot qo‘shish ruxsati berilgan. Narx o‘zgartirish va o‘chirish uchun
+        “Mahsulotlarni boshqarish” ruxsati kerak — uni superadmin Sozlamalar → Lavozimlar orqali beradi.
+      </div>
+
       <div class="divide-y divide-[#f0f2f0]">
         <div v-for="material in store.materials" :key="material.id" class="flex flex-wrap items-center gap-4 px-5 py-4">
           <div class="grid h-10 w-10 place-items-center rounded-xl bg-canvas text-muted"><Package :size="17" /></div>
@@ -52,13 +60,16 @@ async function removeMaterial(material) {
             <p class="text-sm font-bold text-ink">{{ material.name }}</p>
             <p class="mt-1 text-[10px] text-muted">{{ material.isActive ? 'Sotuvda' : 'Faol emas' }} · narx bir tonna uchun</p>
           </div>
-          <div class="flex items-center gap-2">
+          <div v-if="canManage" class="flex items-center gap-2">
             <div class="relative">
               <input :value="priceDraft[material.id] ?? ''" :placeholder="formatAmountInput(material.unitPrice)" class="field !w-[170px] !py-2.5 !pr-14 text-right font-semibold" type="text" inputmode="numeric" autocomplete="off" @input="onPrice($event, material.id)" />
               <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted">so‘m / t</span>
             </div>
             <button class="btn-primary !px-3 !py-2.5" :disabled="!(parseAmountInput(priceDraft[material.id]) > 0)" @click="savePrice(material)"><Check :size="15" /> Saqlash</button>
             <button class="btn-quiet !p-2.5 !text-danger" :aria-label="`${material.name} mahsulotini o‘chirish`" @click="removeMaterial(material)"><Trash2 :size="15" /></button>
+          </div>
+          <div v-else class="text-right">
+            <p class="text-sm font-bold text-ink">{{ money(material.unitPrice) }} <span class="text-[10px] font-normal text-muted">/ t</span></p>
           </div>
         </div>
         <div v-if="!store.materials.length" class="px-5 py-10 text-center text-sm text-muted">Hali mahsulot qo‘shilmagan.</div>

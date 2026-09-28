@@ -11,13 +11,28 @@ export const PERMISSION_CATALOG = [
   { key: 'finance.expenses.create', label: 'Xarajat kiritish', group: 'Moliya', description: 'Karer xarajatlari va ish haqi to‘lovi' },
   { key: 'payroll.manage', label: 'Oylik va stavkani boshqarish', group: 'Xodimlar', description: 'Reys stavkasi va haydovchi avanslari' },
   { key: 'staff.view', label: 'Xodimlarni ko‘rish', group: 'Xodimlar', description: 'Xodimlar va haydovchilar ro‘yxati' },
-  { key: 'staff.manage', label: 'Xodim qo‘shish', group: 'Xodimlar', description: 'Xodim qo‘shish, login va parol berish (faqat superadmin)' },
-  { key: 'roles.manage', label: 'Lavozim va ruxsatlarni sozlash', group: 'Sozlamalar', description: 'Dinamik RBAC lavozimlari va huquqlari (faqat superadmin)' },
-  { key: 'materials.manage', label: 'Mahsulotlarni boshqarish', group: 'Sozlamalar', description: 'Mahsulot qo‘shish, narxi va o‘chirish' },
-  { key: 'finance.manage', label: 'Moliya turlarini boshqarish', group: 'Sozlamalar', description: 'Daromat va xarajat turlarini yaratish' },
+  { key: 'staff.manage', label: 'Xodim qo‘shish', group: 'Xodimlar', description: 'Xodim qo‘shish, login va parol berish (faqat to‘liq huquqli — superadmin)' },
+  { key: 'roles.manage', label: 'Lavozim va ruxsatlarni sozlash', group: 'Sozlamalar', description: 'Dinamik RBAC lavozimlari va huquqlari (faqat to‘liq huquqli — superadmin)' },
+  { key: 'materials.create', label: 'Mahsulot qo‘shish', group: 'Sozlamalar', description: 'Yangi tosh turi va tonna narxini kiritish' },
+  { key: 'materials.manage', label: 'Mahsulotlarni boshqarish', group: 'Sozlamalar', description: 'Mahsulot narxi, faolligi va o‘chirish (qo‘shishdan tashqari)' },
+  { key: 'finance.categories.create', label: 'Moliya turi qo‘shish', group: 'Sozlamalar', description: 'Yangi daromat yoki xarajat turini yaratish' },
+  { key: 'finance.manage', label: 'Moliya turlarini boshqarish', group: 'Sozlamalar', description: 'Moliya turlarini tahrirlash va o‘chirish (qo‘shishdan tashqari)' },
   { key: 'driver.self', label: 'Shaxsiy haydovchi kabineti', group: 'Haydovchi', description: 'Faqat o‘z reyslari, maoshi va xabarlari' },
   { key: 'maintenance.report', label: 'Nosozlik haqida xabar berish', group: 'Texnika', description: 'Texnika bo‘yicha tezkor xabar yuborish' },
 ]
+
+// "To'liq dostup" — lavozimdagi barcha ruxsat kalitlari. Shu holatdagi xodim superadmin
+// deb hisoblanadi: xodim qo'sha, login/parol beradi, lavozim va ruxsatlarni boshqaradi.
+// DB dagi role_has_full_access() va Edge Function'dagi permissionKeysForRole() bilan bir xil qoida.
+// Kalitlar ro'yxati berilishi mumkin: store bazadan yuklangan katalogni uzatadi, aks holda
+// bu yeridagi ko'rsatma ishlatiladi. Shunda serverga yangi kalit qo'shilsa ham
+// "full dostub" baholasi buzilmaydi.
+export const FULL_ACCESS_KEYS = PERMISSION_CATALOG.map((permission) => permission.key)
+export const hasFullAccess = (permissions, catalog = FULL_ACCESS_KEYS) => {
+  const keys = catalog?.length ? catalog : FULL_ACCESS_KEYS
+  const owned = new Set(permissions ?? [])
+  return keys.length > 0 && keys.every((key) => owned.has(key))
+}
 
 export const PERMISSION_GROUPS = [...new Set(PERMISSION_CATALOG.map((item) => item.group))]
 export const permissionLabel = (key) => PERMISSION_CATALOG.find((item) => item.key === key)?.label ?? key

@@ -13,7 +13,7 @@ export const router = createRouter({
     { path: '/finance', name: 'finance', component: () => import('../views/FinanceView.vue'), meta: { permission: 'finance.view', title: 'Moliya' } },
     { path: '/drivers', name: 'drivers', component: () => import('../views/DriversView.vue'), meta: { permissionAny: ['staff.view', 'driver.self'], title: 'Haydovchilar' } },
     { path: '/staff', name: 'staff', component: () => import('../views/StaffView.vue'), meta: { permission: 'staff.view', title: 'Xodimlar' } },
-    { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { permissionAny: ['roles.manage', 'materials.manage', 'finance.manage'], title: 'Sozlamalar' } },
+    { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { permissionAny: ['roles.manage', 'materials.create', 'materials.manage', 'finance.categories.create', 'finance.manage'], title: 'Sozlamalar' } },
     { path: '/no-access', name: 'no-access', component: () => import('../views/NoAccessView.vue'), meta: { title: 'Ruxsat yo‘q' } },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
   ],

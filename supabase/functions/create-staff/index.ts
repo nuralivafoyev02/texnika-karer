@@ -1,10 +1,11 @@
 import {
   authEmailFor, corsHeaders, generatePassword, json, LOGIN_PATTERN, normalizePassword, passwordProblem,
-  requireSuperadmin, schemaIsStale, serviceClient,
+  permissionKeysForRole, requireSuperadmin, schemaIsStale, serviceClient,
 } from '../_shared/auth.ts'
 
 // Xodim qo'shish: login va parol shu zahotiyoq yaratiladi. Taklif xati, email tasdiqi
 // yoki redirect link ishlatilmaydi — parolni Supabase Auth o'zi bcrypt bilan hashlab saqlaydi.
+// Yaratilgan xodimga to'liq huquqli lavozim biriktirilsa, u darhol superadmin bo'ladi.
 Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (request.method !== 'POST') return json({ error: 'Faqat POST so‘rovi qabul qilinadi.' }, 405)
@@ -40,12 +41,13 @@ Deno.serve(async (request: Request) => {
   if (roleError || !targetRole) return json({ error: 'Tanlangan lavozim topilmadi.' }, 400)
 
   // Nafas olish: superadmin o'ziga tegishli bo'lmagan ruxsatni boshqaruvga bermasin.
-  const { data: targetLinks } = await admin.from('role_permissions').select('permission_id').eq('role_id', roleId)
-  const { data: superadminLinks } = await admin.from('role_permissions').select('permission_id').eq('role_id', caller.roleId)
-  const { data: permissionRows } = await admin.from('permissions').select('id,key')
-  const keyById = new Map((permissionRows ?? []).map((row) => [row.id, row.key]))
-  const superadminKeys = new Set((superadminLinks ?? []).map((row) => keyById.get(row.permission_id)).filter(Boolean))
-  const elevated = (targetLinks ?? []).map((row) => keyById.get(row.permission_id)).filter((key) => key && !superadminKeys.has(key))
+  // To'liq huquqli chaqiruvchida barcha kalitlar mavjud bo'lgani uchun bu tekshiruv hech qachon
+  // to'g'ri lavozimni rad etmaydi.
+  const [{ keys: targetKeys, fullAccess: targetIsFullAccess }, { keys: superadminKeys }] = await Promise.all([
+    permissionKeysForRole(admin, roleId),
+    permissionKeysForRole(admin, caller.roleId),
+  ])
+  const elevated = [...targetKeys].filter((key) => !superadminKeys.has(key))
   if (elevated.length) return json({ error: `Bu lavozimga berilayotgan ruxsatlar sizda yo‘q: ${elevated.join(', ')}` }, 403)
 
   const email = authEmailFor(login)
@@ -70,6 +72,11 @@ Deno.serve(async (request: Request) => {
     return json({ error: message }, 400)
   }
 
+  // To'liq huquq = superadmin: lavozim ruxsat katalogining hammasini qamrab olsa, yozuv
+  // shu holda yaratiladi. (DB triggeri ham xuddi shuni qayta hisoblaydi — bu esa Edge Function
+  // javobida darhol ko'rsatish uchun kerak.)
+  const isSuperadmin = targetIsFullAccess === true
+
   const { error: insertError } = await admin.from('users').insert({
     id: created.user.id,
     full_name: fullName,
@@ -80,7 +87,7 @@ Deno.serve(async (request: Request) => {
     role_id: roleId,
     driver_rate_per_trip: driverRate,
     is_active: true,
-    is_superadmin: false,
+    is_superadmin: isSuperadmin,
     password_changed_at: new Date().toISOString(),
   })
   if (insertError) {
@@ -94,6 +101,7 @@ Deno.serve(async (request: Request) => {
     login,
     email,
     fullName,
+    isSuperadmin,
     // Parol faqat shu javobda qaytariladi: hech qayerda saqlanmaydi.
     password: wantsGenerated ? password : undefined,
   }, 201)

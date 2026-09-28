@@ -6,6 +6,9 @@ import TransactionCategoryForm from '../forms/TransactionCategoryForm.vue'
 import { useQuarryStore } from '../../stores/quarry'
 
 const store = useQuarryStore()
+// finance.categories.create — faqat yangi tur yaratish;
+// finance.manage — qo'shish, tahrirlash va o'chirish.
+const canManage = computed(() => store.can('finance.manage'))
 const showEditor = ref(false)
 const editing = ref(null)
 const direction = ref('out')
@@ -87,13 +90,23 @@ async function remove(category) {
               <p class="mt-0.5 truncate text-[11px] text-muted">{{ category.hint || 'Izoh kiritilmagan.' }}</p>
             </div>
             <div class="flex shrink-0 items-center gap-1">
-              <button class="btn-quiet !p-2" :aria-label="`${category.label} turini tahrirlash`" @click="openEdit(category)"><Pencil :size="14" /></button>
-              <button class="btn-quiet !p-2 !text-danger" :aria-label="`${category.label} turini o‘chirish`" @click="remove(category)"><Trash2 :size="14" /></button>
+              <template v-if="canManage">
+                <button class="btn-quiet !p-2" :aria-label="`${category.label} turini tahrirlash`" @click="openEdit(category)"><Pencil :size="14" /></button>
+                <button class="btn-quiet !p-2 !text-danger" :aria-label="`${category.label} turini o‘chirish`" @click="remove(category)"><Trash2 :size="14" /></button>
+              </template>
             </div>
           </div>
           <div v-if="!group.items.length" class="px-5 py-10 text-center text-sm text-muted">Hali turi yaratilmagan.</div>
         </div>
       </section>
+    </div>
+
+    <div v-if="!canManage" class="flex items-start gap-3 rounded-2xl border border-[#cfe0d3] bg-[#f2f8f3] p-4">
+      <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><LockKeyhole :size="17" /></div>
+      <div>
+        <p class="text-xs font-bold text-forest">Faqat qo‘shish ruxsati</p>
+        <p class="mt-1 text-[11px] leading-5 text-[#66816e]">Siz yangi daromat yoki xarajat turini mustaqil yarata olasiz. Mavjud turlarni tahrirlash va o‘chirish uchun “Moliya turlarini boshqarish” ruxsati kerak — uni superadmin Sozlamalar → Lavozimlar orqali beradi.</p>
+      </div>
     </div>
 
     <div class="flex items-start gap-3 rounded-2xl border border-[#cfe0d3] bg-[#f2f8f3] p-4">

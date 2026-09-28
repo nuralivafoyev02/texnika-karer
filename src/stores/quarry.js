@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { createDemoData } from '../lib/demo-data'
 import { isSameMonth, isToday, localDayKey } from '../lib/format'
+import { FULL_ACCESS_KEYS, hasFullAccess } from '../lib/permissions'
 import { supabase, supabaseConfigured, toAuthEmail } from '../lib/supabase'
 
 const STORAGE_KEY = 'qazilma-erp-demo-v1'
@@ -150,6 +151,9 @@ export const useQuarryStore = defineStore('quarry', {
       activeUserId: seed.activeUserId ?? 'u-boss',
       users: seed.users ?? blank.users,
       roles: seed.roles ?? blank.roles,
+      // Ruxsat kalitlari bazadan olinadi: "to'liq dostub" baholasi shu ro'yxatga qarab
+      // qo'yiladi, shuning uchun serverga yangi kalit qo'shilsa UI ham to'g'ri qaror beradi.
+      permissionKeys: [],
       clients: seed.clients ?? blank.clients,
       materials: seed.materials ?? blank.materials,
       vehicles: seed.vehicles ?? blank.vehicles,
@@ -171,6 +175,24 @@ export const useQuarryStore = defineStore('quarry', {
     },
     currentRole() {
       return this.currentUser ? roleMap(this.currentUser.roleId, this.roles) ?? null : null
+    },
+    // Xodim qo'shish, parol berish va profil tahrirlash — faqat to'liq huquqli (superadmin).
+    // Getter bo'lishi muhim: action bo'lsa, `v-if="store.canManageStaff"` har doim rost bo'lib
+    // qolardi va tugmalar ruxsatsiz xodimlarga ham ko'rinib turardi.
+    canManageStaff() {
+      return this.isSuperadmin(this.currentUser)
+    },
+    // "To'liq dostub" kalitlari: bazadan yuklangan katalog, yo'q bo'lsa lokal ko'rsatma.
+    fullAccessKeys(state) {
+      return state.permissionKeys.length ? state.permissionKeys : FULL_ACCESS_KEYS
+    },
+    // materials.create — faqat qo'shish; materials.manage — qo'shish, narx va o'chirish.
+    canCreateMaterial() {
+      return this.can('materials.manage') || this.can('materials.create')
+    },
+    // finance.categories.create — faqat yangi tur yaratish; finance.manage — to'liq boshqaruv.
+    canCreateCategory() {
+      return this.can('finance.manage') || this.can('finance.categories.create')
     },
     homeRoute() {
       if (this.can('dashboard.view')) return { name: 'dashboard' }
@@ -244,9 +266,16 @@ export const useQuarryStore = defineStore('quarry', {
       if (!this.currentUser || !this.currentRole || !this.currentUser.isActive) return false
       return this.currentRole.permissions?.includes(permission) ?? false
     },
-    canManageStaff() {
-      if (!this.currentUser?.isActive) return false
-      return this.remoteMode ? this.currentUser?.isSuperadmin === true : this.currentUser?.isSuperadmin !== false
+    // To'liq dostub — lavozim katalogdagi barcha ruxsatlarni qamrab olgan bo'lsa, xodim
+    // superadmin deb hisoblanadi. DB (is_superadmin) ustuni ham shu qoidani trigger orqali
+    // saqlaydi, lekin UI uchun role.permissions dan hisoblash tez va har doim dolzarb.
+    roleHasFullAccess(roleId) {
+      return hasFullAccess(roleMap(roleId, this.roles)?.permissions, this.fullAccessKeys)
+    },
+    isSuperadmin(user = this.currentUser) {
+      if (!user || user.isActive === false) return false
+      if (user.isSuperadmin === true) return true
+      return this.roleHasFullAccess(user.roleId)
     },
     roleName(user) {
       return roleMap(user?.roleId, this.roles)?.name ?? 'Lavozim belgilanmagan'
@@ -479,6 +508,7 @@ export const useQuarryStore = defineStore('quarry', {
         if (permissionsResult.error) throw new Error(`Ruxsatlar ro‘yxatini o‘qib bo‘lmadi: ${permissionsResult.error.message}`)
         if (rolePermissionsResult.error) throw new Error(`Lavozim ruxsatlarini o‘qib bo‘lmadi: ${rolePermissionsResult.error.message}`)
         const permissionRows = permissionsResult.data ?? []
+        this.permissionKeys = permissionRows.map((permission) => permission.key)
         const permissionKeys = new Map(permissionRows.map((permission) => [permission.id, permission.key]))
         const assigned = new Map()
         for (const row of rolePermissionsResult.data ?? []) {
@@ -511,7 +541,7 @@ export const useQuarryStore = defineStore('quarry', {
         const needsReports = can('dashboard.view') || can('finance.view') || can('fleet.manage') || can('driver.self')
         const needsClientBalances = can('clients.view') || can('clients.manage') || can('dashboard.view')
         const needsFinancialTotals = can('finance.view') || can('dashboard.view')
-        const needsCategories = can('finance.manage') || can('finance.view') || can('finance.payments.create') || can('finance.expenses.create') || can('dashboard.view')
+        const needsCategories = can('finance.manage') || can('finance.categories.create') || can('finance.view') || can('finance.payments.create') || can('finance.expenses.create') || can('dashboard.view')
         const requests = [
           needsClients ? getRows('mijozlar', supabase.from('clients').select('*').order('name')) : Promise.resolve([]),
           needsVehicles ? getRows('texnikalar', supabase.from('vehicles').select('*').order('plate')) : Promise.resolve([]),
@@ -716,7 +746,7 @@ export const useQuarryStore = defineStore('quarry', {
       this.notify('Yangi mijoz qo‘shildi.')
     },
     async createStaff(payload) {
-      if (!this.canManageStaff) throw new Error('Xodim qo‘shish huquqi faqat superadminda bor.')
+      if (!this.canManageStaff) throw new Error('Xodim qo‘shish huquqi faqat to‘liq huquqli (superadmin) xodimda bor.')
       const role = this.roles.find((item) => item.id === payload.roleId)
       if (!role) throw new Error('Lavozimni tanlang.')
       const request = {
@@ -732,18 +762,22 @@ export const useQuarryStore = defineStore('quarry', {
         return data
       }
       if (this.users.some((user) => user.login === request.login)) throw new Error('Bu login allaqachon band.')
+      // To'liq huquqli lavozim berilsa, demo rejimida ham xodim superadmin bo'ladi.
+      const grantedFullAccess = this.roleHasFullAccess(role.id)
       this.users.push({
         id: makeId('U'), fullName: request.fullName, login: request.login,
         email: toAuthEmail(request.login), phone: request.phone, roleId: role.id,
         title: request.title || role.name, driverRatePerTrip: request.driverRatePerTrip,
-        isActive: true, isSuperadmin: false,
+        isActive: true, isSuperadmin: grantedFullAccess,
       })
       this.persistDemo()
-      this.notify('Demo rejimida xodim ro‘yxatiga qo‘shildi.')
-      return { ok: true, login: request.login }
+      this.notify(grantedFullAccess
+        ? `${request.fullName} — to‘liq huquqli lavozim bilan qo‘shildi, superadmin sifatida boshqaradi.`
+        : 'Demo rejimida xodim ro‘yxatiga qo‘shildi.')
+      return { ok: true, login: request.login, isSuperadmin: grantedFullAccess }
     },
     async setStaffPassword(userId, password) {
-      if (!this.canManageStaff) throw new Error('Parolni o‘zgartirish huquqi faqat superadminda bor.')
+      if (!this.canManageStaff) throw new Error('Parolni o‘zgartirish huquqi faqat to‘liq huquqli (superadmin) xodimda bor.')
       if (String(password || '').trim().length < 8) throw new Error('Parol kamida 8 ta belgidan iborat bo‘lishi kerak.')
       if (!this.remoteMode) { this.notify('Demo rejimida parol haqiqiy hisobga saqlanmaydi.'); return }
       const { data, error } = await supabase.functions.invoke('set-staff-password', { body: { userId, password: String(password).trim() } })
@@ -752,7 +786,7 @@ export const useQuarryStore = defineStore('quarry', {
       this.notify(`${data?.fullName || 'Xodim'} uchun yangi parol saqlandi.`)
     },
     async updateStaffProfile(userId, patch) {
-      if (!this.canManageStaff) throw new Error('Xodimni tahrirlash huquqi faqat superadminda bor.')
+      if (!this.canManageStaff) throw new Error('Xodimni tahrirlash huquqi faqat to‘liq huquqli (superadmin) xodimda bor.')
       const body = {
         full_name: patch.fullName?.trim() || undefined,
         phone: patch.phone?.trim() || null,
@@ -762,8 +796,11 @@ export const useQuarryStore = defineStore('quarry', {
       }
       Object.keys(body).forEach((key) => body[key] === undefined && delete body[key])
       if (!Object.keys(body).length) return
-      const target = this.users.find((item) => item.id === userId)
-      if (target?.isSuperadmin && (body.role_id || body.is_active === false)) throw new Error('Superadmin lavozimi va holatini o‘zgartirib bo‘lmaydi.')
+      // O'zini o'zi bloklamaslik: boshqa superadmin'lar boshqaruvni qayta taqsimlashi mumkin,
+      // lekin o'z lavozimi yoki holatini o'zgartirish tizimdan chiqib ketishga olib keladi.
+      if (userId === this.currentUser?.id && (body.role_id || body.is_active === false)) {
+        throw new Error('O‘z lavozimingiz yoki holatingizni o‘zgartirib bo‘lmaydi.')
+      }
       if (body.role_id && !this.roles.some((role) => role.id === body.role_id)) throw new Error('Lavozim topilmadi.')
       if (this.remoteMode) {
         const { error } = await supabase.from('users').update(body).eq('id', userId)
@@ -775,7 +812,7 @@ export const useQuarryStore = defineStore('quarry', {
           if (body.full_name) user.fullName = body.full_name
           if ('phone' in body) user.phone = body.phone ?? ''
           if ('title' in body) user.title = body.title ?? ''
-          if (body.role_id) user.roleId = body.role_id
+          if (body.role_id) { user.roleId = body.role_id; user.isSuperadmin = this.roleHasFullAccess(body.role_id) }
           if (body.is_active !== undefined) user.isActive = body.is_active
           this.persistDemo()
         }
@@ -823,19 +860,21 @@ export const useQuarryStore = defineStore('quarry', {
       this.notify('Lavozim o‘chirildi.')
     },
     async updateMaterial(materialId, unitPrice) {
+      if (!this.can('materials.manage')) throw new Error('Mahsulot narxini o‘zgartirish ruxsati yo‘q.')
       const price = Number(unitPrice)
       if (!(price > 0)) throw new Error('Narx 0 dan katta bo‘lishi kerak.')
       if (this.remoteMode) {
         const { error } = await supabase.from('materials').update({ unit_price: price }).eq('id', materialId)
-        if (error) throw error
+        if (error) throw new Error(readableDbError(error, 'Mahsulot narxini saqlab bo‘lmadi.'))
       }
       const material = this.materials.find((item) => item.id === materialId)
       if (material) material.unitPrice = price
       this.persistDemo()
       this.notify('Mahsulot narxi yangilandi.')
     },
+    // materials.create — faqat qo'shish; materials.manage — qo'shish, narx va o'chirish.
     async createMaterial(payload) {
-      if (!this.can('materials.manage')) throw new Error('Mahsulot qo‘shish ruxsati yo‘q.')
+      if (!this.canCreateMaterial) throw new Error('Mahsulot qo‘shish ruxsati yo‘q.')
       const name = String(payload.name || '').trim()
       const unitPrice = Number(payload.unitPrice)
       if (name.length < 2) throw new Error('Mahsulot nomini kiriting.')
@@ -872,8 +911,11 @@ export const useQuarryStore = defineStore('quarry', {
       this.persistDemo()
       this.notify(`“${material.name}” mahsuloti o‘chirildi.`)
     },
+    // finance.categories.create — faqat yangi tur yaratish; finance.manage — qo'shish,
+    // tahrirlash va o'chirish. Ikkalasi bo'lmasa, xodim o'z turini yarata olmaydi va
+    // superadminga murojaat qilishi kerak bo'ladi.
     async createCategory(payload) {
-      if (!this.can('finance.manage')) throw new Error('Moliya turlarini boshqarish ruxsati yo‘q.')
+      if (!this.canCreateCategory) throw new Error('Moliya turi qo‘shish ruxsati yo‘q.')
       const label = String(payload.label || '').trim()
       const hint = String(payload.hint || '').trim()
       const direction = payload.direction === 'in' ? 'in' : 'out'

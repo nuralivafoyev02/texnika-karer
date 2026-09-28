@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ShieldCheck, Plus, Pencil, Trash2, Package, CircleAlert, UsersRound, LockKeyhole, WalletCards, Settings2 } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import RoleEditor from '../components/forms/RoleEditor.vue'
@@ -10,19 +10,30 @@ import { useQuarryStore } from '../stores/quarry'
 
 const store = useQuarryStore()
 
+// Yangi tablar: *create — faqat qo'shish, *manage — to'liq boshqaruv (qo'shish + tahrirlash + o'chirish).
 const tabs = computed(() => [
   { key: 'roles', label: 'Lavozimlar', icon: ShieldCheck, show: store.can('roles.manage') },
-  { key: 'materials', label: 'Mahsulotlar', icon: Package, show: store.can('materials.manage') },
-  { key: 'finance', label: 'Moliya turlari', icon: WalletCards, show: store.can('finance.manage') },
+  { key: 'materials', label: 'Mahsulotlar', icon: Package, show: store.canCreateMaterial },
+  { key: 'finance', label: 'Moliya turlari', icon: WalletCards, show: store.canCreateCategory },
 ].filter((tab) => tab.show))
 
-const firstTab = tabs.value[0]?.key ?? 'roles'
-const activeTab = ref(firstTab)
+const activeTab = ref('')
 const showEditor = ref(false)
 const editingRole = ref(null)
 const saving = ref(false)
 
-const roles = computed(() => store.roles.map((role) => ({ ...role, people: store.users.filter((user) => user.roleId === role.id).length })))
+// Ruxsatlar kech yuklansa (cache'dan ochilish holati), joriy tab ko'rinmay qolmasligi kerak.
+watch(tabs, (items) => {
+  if (!items.length) return
+  if (!items.some((tab) => tab.key === activeTab.value)) activeTab.value = items[0].key
+}, { immediate: true })
+
+const roles = computed(() => store.roles.map((role) => ({
+  ...role,
+  people: store.users.filter((user) => user.roleId === role.id).length,
+  // To'liq dostugini belgilash: ushbu lavozimdagi xodimlar superadmin bo'ladi.
+  fullAccess: store.roleHasFullAccess(role.id),
+})))
 
 function openRole(role = null) {
   editingRole.value = role ? { ...role, permissions: [...role.permissions] } : null
@@ -76,6 +87,7 @@ async function removeRole(role) {
             <div class="grid h-11 w-11 place-items-center rounded-[14px]" :class="role.name === 'Boshliq' ? 'bg-[#e8f3eb] text-leaf' : role.name === 'Buxgalter' ? 'bg-[#eaf2fa] text-[#4f7595]' : role.name.toLowerCase().includes('haydovchi') ? 'bg-[#eff2f7] text-[#56667e]' : 'bg-[#fff4e3] text-[#b77824]'"><ShieldCheck :size="20" /></div>
             <div class="flex items-center gap-1">
               <span v-if="role.isSystem" class="tag tag-blue">Tizim roli</span>
+              <span v-if="role.fullAccess" class="tag" title="Bu lavozimdagi har bir xodim superadmin huquqiga ega bo‘ladi"><LockKeyhole :size="10" class="mr-1" />To‘liq dostup</span>
               <button class="btn-quiet !p-2" aria-label="Lavozimni tahrirlash" @click="openRole(role)"><Pencil :size="14" /></button>
               <button v-if="!role.isSystem" class="btn-quiet !p-2 !text-danger" aria-label="Lavozimni o‘chirish" @click="removeRole(role)"><Trash2 :size="14" /></button>
             </div>
@@ -97,12 +109,13 @@ async function removeRole(role) {
         <div>
           <p class="text-xs font-bold text-forest">Dinamik RBAC qanday ishlaydi?</p>
           <p class="mt-1 text-[11px] leading-5 text-[#66816e]">Xodimga rol biriktiriladi. Menyu va tugmalar rol ruxsatlariga qarab filtrlanadi; Supabase RLS esa xuddi shu huquq kalitlarini serverda tekshiradi. UI'da tugmani yashirishning o‘zi xavfsizlik chegarasi hisoblanmaydi.</p>
+          <p class="mt-2 text-[11px] leading-5 text-[#66816e]"><b class="text-forest">To‘liq dostub = superadmin.</b> Lavozimga katalogdagi barcha ruxsatlar berilsa, u lavozimdagi xodimlar superadmin bo‘ladi: xodim qo‘shadi, login/parol beradi, lavozim va ruxsatlarni boshqaradi. Superadminlar soni cheklanmaydi. “Xodim qo‘shish” va “Moliya turi qo‘shish” kabi alohida <i>create</i> ruxsatlari esa oddiy xodimga ham kerakli ma’lumotni mustaqil kiritish imkonini beradi.</p>
         </div>
       </div>
     </template>
 
-    <MaterialsPanel v-else-if="activeTab === 'materials' && store.can('materials.manage')" />
-    <FinanceCategoriesPanel v-else-if="activeTab === 'finance' && store.can('finance.manage')" />
+    <MaterialsPanel v-else-if="activeTab === 'materials' && store.canCreateMaterial" />
+    <FinanceCategoriesPanel v-else-if="activeTab === 'finance' && store.canCreateCategory" />
 
     <div class="flex items-start gap-3 rounded-2xl border border-[#cfe0d3] bg-[#f2f8f3] p-4">
       <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><CircleAlert :size="17" /></div>

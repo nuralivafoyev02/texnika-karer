@@ -13,6 +13,8 @@ const accountantKeys = [
   'finance.payments.create', 'finance.expenses.create', 'finance.manage', 'payroll.manage', 'staff.view',
   'maintenance.report',
 ]
+// "Faqat kiritish" namunasi: to'liq boshqaruvsiz, o'z mahsulot/turini yaratadigan xodim.
+const entryKeys = ['dashboard.view', 'trips.view', 'fleet.view', 'materials.create', 'finance.view', 'finance.categories.create']
 const scaleKeys = ['trips.view', 'trips.create', 'fleet.view']
 const driverKeys = ['driver.self', 'maintenance.report']
 
@@ -32,6 +34,7 @@ export function createDemoData() {
   const roles = [
     { id: 'role-boss', name: 'Boshliq', description: 'Barcha bo‘limlar va tizim sozlamalari', color: 'green', isSystem: true, permissions: allKeys },
     { id: 'role-accountant', name: 'Buxgalter', description: 'Moliya, mijozlar va ish haqi hisobi', color: 'blue', isSystem: true, permissions: accountantKeys },
+    { id: 'role-entry', name: 'Kirituvchi', description: 'Mahsulot va moliya turlarini kiritadi, boshqarmaydi', color: 'slate', isSystem: false, permissions: entryKeys },
     { id: 'role-scale', name: 'Tarozi ustasi', description: 'Reyslarni ro‘yxatga olish', color: 'amber', isSystem: true, permissions: scaleKeys },
     { id: 'role-driver', name: 'Haydovchi', description: 'Faqat o‘z ish faoliyati va xabarlari', color: 'slate', isSystem: true, permissions: driverKeys },
   ]
@@ -39,6 +42,7 @@ export function createDemoData() {
   const users = [
     { id: 'u-boss', fullName: 'Javlon Karimov', login: 'karersuperadmin', email: 'javlon@qazilma.uz', phone: '+998 90 123 45 67', roleId: 'role-boss', title: 'Bosh direktor', driverRatePerTrip: 0, isActive: true, isSuperadmin: true },
     { id: 'u-accountant', fullName: 'Nargiza Tursunova', email: 'nargiza@qazilma.uz', phone: '+998 90 234 56 78', roleId: 'role-accountant', title: 'Bosh buxgalter', driverRatePerTrip: 0, isActive: true },
+    { id: 'u-entry', fullName: 'Otabek Rustamov', email: 'otabek@qazilma.uz', phone: '+998 90 555 44 33', roleId: 'role-entry', title: 'Omborchi', driverRatePerTrip: 0, isActive: true },
     { id: 'u-scale', fullName: 'Sherzod Islomov', email: 'sherzod@qazilma.uz', phone: '+998 91 345 67 89', roleId: 'role-scale', title: 'Tarozi ustasi', driverRatePerTrip: 0, isActive: true },
     { id: 'u-driver-1', fullName: 'Mansur Rahimov', email: 'mansur@qazilma.uz', phone: '+998 93 111 22 33', roleId: 'role-driver', title: 'Haydovchi', driverRatePerTrip: 50000, isActive: true },
     { id: 'u-driver-2', fullName: 'Azizbek Qodirov', email: 'azizbek@qazilma.uz', phone: '+998 93 222 33 44', roleId: 'role-driver', title: 'Haydovchi', driverRatePerTrip: 50000, isActive: true },
