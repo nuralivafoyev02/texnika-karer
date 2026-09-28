@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { UserRoundCog, Plus, Search, Phone, ShieldCheck, UsersRound, ArrowUpRight, UserPlus, KeyRound, Pencil, Copy, Check } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import StaffForm from '../components/forms/StaffForm.vue'
+import { phoneHref } from '../lib/phone'
 import { useQuarryStore } from '../stores/quarry'
 import { initials, money } from '../lib/format'
 
@@ -68,7 +69,7 @@ async function copyCredentials() {
         <tr v-for="user in staff" :key="user.id" class="border-b border-[#f0f2f0] last:border-0 hover:bg-[#fbfcfb]"><td class="px-5 py-4"><div class="flex items-center gap-3"><div class="avatar" :class="store.userCan(user, 'driver.self') ? 'avatar-driver' : store.roleName(user) === 'Buxgalter' ? 'avatar-blue' : ''">{{ initials(user.fullName) }}</div><div><p class="text-xs font-bold text-ink">{{ user.fullName }} <span v-if="store.isSuperadmin(user)" class="ml-1 rounded bg-[#fff4e3] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#b77824]">super</span></p><p class="mt-1 text-[10px] text-muted">{{ user.title || store.roleName(user) }}</p></div></div></td>
           <td class="px-4 py-4"><code class="rounded-md bg-canvas px-2 py-1 text-[11px] text-ink">{{ user.login || '—' }}</code></td>
           <td class="px-4 py-4"><div class="inline-flex items-center gap-1.5 rounded-lg bg-canvas px-2.5 py-1.5 text-[10px] font-bold text-ink"><ShieldCheck :size="12" class="text-leaf" />{{ store.roleName(user) }}</div></td>
-          <td class="px-4 py-4"><a v-if="user.phone" :href="`tel:${user.phone}`" class="flex items-center gap-1.5 text-[10px] text-muted hover:text-leaf"><Phone :size="12" />{{ user.phone }}</a><span v-else class="text-[10px] text-muted">—</span></td>
+          <td class="px-4 py-4"><a v-if="user.phone" :href="phoneHref(user.phone)" class="flex items-center gap-1.5 text-[10px] text-muted hover:text-leaf"><Phone :size="12" />{{ user.phone }}</a><span v-else class="text-[10px] text-muted">—</span></td>
           <td class="px-4 py-4"><span v-if="user.driverRatePerTrip" class="text-xs font-semibold text-ink">{{ money(user.driverRatePerTrip) }} <small class="text-[9px] font-normal text-muted">/ reys</small></span><span v-else class="text-xs text-muted">—</span></td>
           <td class="px-5 py-4 text-right"><span class="status-pill" :class="user.isActive ? 'status-active' : 'status-service'">{{ user.isActive ? 'Faol' : 'Faol emas' }}</span></td>
           <td v-if="store.canManageStaff" class="px-5 py-4"><div class="flex items-center justify-end gap-1"><button class="btn-quiet !p-1.5" title="Parolni yangilash" @click="openPassword(user)"><KeyRound :size="14" /></button><button class="btn-quiet !p-1.5" title="Tahrirlash" @click="editing = user"><Pencil :size="14" /></button></div></td></tr>

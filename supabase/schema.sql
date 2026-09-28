@@ -49,6 +49,9 @@ create index if not exists users_role_id_idx on public.users(role_id);
 alter table public.users add column if not exists login text;
 alter table public.users add column if not exists is_superadmin boolean not null default false;
 alter table public.users add column if not exists password_changed_at timestamptz;
+-- Profil rasmi: storage'da 'avatars/<user_id>/<fayl>' ko'rinishida saqlanadi, bu jadvalda
+-- faqat yo'l saqlanadi. O'zgartirish faqat `update_my_profile` RPC orqali (o'z profiliga).
+alter table public.users add column if not exists avatar_path text;
 update public.users set login = lower(regexp_replace(coalesce(split_part(email, '@', 1), ''), '[^a-z0-9._-]', '', 'g'))
 where login is null or login = '';
 -- Har qanday eski qiymat formatga mos kelmasa, uni o'qiladigan zaxira loginga almashtiramiz,
@@ -632,6 +635,9 @@ create trigger role_permissions_sync_superadmins
 -- is_superadmin — samaraviy qiymat (trigger ishlamagan holat uchun ham qayta hisoblanadi).
 create or replace view public.staff_directory as
 select u.id, u.login, u.full_name, u.email, u.phone, u.title, u.role_id, u.is_active,
+  -- Profil rasmi faqat "staff.view" yoki superadmin uchun ochiq (boshqa xodimga kerak emas).
+  case when u.id = auth.uid() or public.has_permission('staff.view') or public.is_superadmin()
+    then u.avatar_path else null end as avatar_path,
   (u.is_superadmin or public.role_has_full_access(u.role_id)) as is_superadmin,
   case when u.id = auth.uid() or public.has_permission('staff.view') or public.is_superadmin()
     then u.driver_rate_per_trip else 0 end as driver_rate_per_trip
@@ -663,6 +669,163 @@ begin
   if not found then raise exception 'Haydovchi profili topilmadi.' using errcode = 'P0002'; end if;
 end;
 $$;
+
+-- ── Telefon raqami: bitta kanonik shakl ─────────────────────────────────────
+-- Frontend har doim "+998 90 123 45 67" shaklida saqlaydi, lekin himoya serverda
+-- bo'lishi kerak: Edge Function'lar service-role orqali yozadi, superadmin esa
+-- `grant update` bilan to'g'ridan-to'g'ri yozadi — bular RPC tekshiruvidan o'tmaydi.
+--
+-- `format_phone_uz` — istalgan shakldan kiritilgan raqamni kanonik shaklga
+--   keltiradi: "+998 90 123 45 67", "998901234567", "90 123 45 67" → bir xil
+--   natija. Milliy qism 9 ta raqamdan oshsa kesiladi.
+-- `phone_is_valid_uz` — bo'sh/null yoki to'liq 9 raqamli milliy qism (ruxsat etiladi).
+create or replace function public.format_phone_uz(p_value text)
+returns text
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_digits text;
+  v_body   text;
+begin
+  v_digits := regexp_replace(coalesce(p_value, ''), '[^0-9]', '', 'g');
+  -- Boshdagi 998 — mamlakat kodi, faqat "+" bilan yozilgan bo'lsa yoki jami
+  -- raqamlar 9 tadan ko'p bo'lsa (ya'ni to'liq xalqaro raqam).
+  if v_digits like '998%' and (left(btrim(p_value), 1) = '+' or length(v_digits) > 9) then
+    v_digits := substr(v_digits, 4);
+  end if;
+  v_body := substr(v_digits, 1, 9);
+  if v_body = '' then
+    return null;
+  end if;
+  return '+998 ' || rtrim(
+    btrim(substr(v_body, 1, 2) || ' ' || substr(v_body, 3, 3) || ' ' || substr(v_body, 6, 2) || ' ' || substr(v_body, 8, 2))
+  );
+end;
+$$;
+
+create or replace function public.phone_is_valid_uz(p_value text)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select
+    case
+      when p_value is null or btrim(p_value) = '' then true
+      -- Kiritilgan raqamlar soni ham nazorat qilinadi: aks holda ortiqcha raqamlar
+      -- jim kesilib ketardi va xato foydalanuvchiga ko'rinmasdi. Bu frontend va
+      -- Edge Function bilan bir xil qoida.
+      when length(regexp_replace(coalesce(p_value, ''), '[^0-9]', '', 'g')) > 12 then false
+      else public.format_phone_uz(p_value) is not null
+        and length(regexp_replace(public.format_phone_uz(p_value), '[^0-9]', '', 'g')) = 12
+    end;
+$$;
+
+comment on function public.format_phone_uz(text) is 'Telefon raqamini "+998 90 123 45 67" kanonik shakliga keltiradi (bo‘sh kiritilsa NULL qaytaradi).';
+comment on function public.phone_is_valid_uz(text) is 'Telefon raqami bo‘sh yoki to‘liq o‘zbekiston raqami bo‘lsa true.';
+
+
+-- ── O'z profilini tahrirlash ────────────────────────────────────────────────
+-- Xodim ism-familiyasi, telefon raqami va profil rasmini O'ZIGA o'zgartira oladi.
+-- Muhim: bu funksiya atama-fetat shu 3 ustunga yozadi — role_id, is_active va
+-- driver_rate_per_trip ga tegilmaydi. Shu sabab xodim o'z lavozimini yoki faollik
+-- holatini o'zgartirib tizimdan chiqib ketolmaydi (boshqa superadmin esa
+-- `updateStaffProfile` orqali bemalol boshqaradi).
+create or replace function public.update_my_profile(
+  p_full_name text default null,
+  p_phone text default null,
+  p_avatar_path text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Ruxsat berilmagan.' using errcode = '42501';
+  end if;
+  if p_full_name is not null then
+    if length(btrim(p_full_name)) < 2 then
+      raise exception 'Ism-familiya kamida 2 ta belgidan iborat bo‘lishi kerak.' using errcode = '22023';
+    end if;
+    if length(btrim(p_full_name)) > 120 then
+      raise exception 'Ism-familiya 120 ta belgidan oshmasligi kerak.' using errcode = '22023';
+    end if;
+  end if;
+  if p_phone is not null and not public.phone_is_valid_uz(p_phone) then
+    raise exception 'Telefon raqami noto‘g‘ri. Shakl: +998 90 123 45 67' using errcode = '22023';
+  end if;
+  -- Rasm faqat shaxsiy papkaga: boshqa xodimning rasmini o'z profiliga bog'lab olmaydi.
+  if p_avatar_path is not null and p_avatar_path <> ''
+     and p_avatar_path not like 'avatars/' || auth.uid()::text || '/%' then
+    raise exception 'Rasm fayli shaxsiy papkaga joylashishi kerak.' using errcode = '42501';
+  end if;
+
+  update public.users u
+     set full_name = coalesce(btrim(p_full_name), u.full_name),
+         -- null = o'zgartirilmadi, bo'sh satr = o'chirildi, to'liq = kanonik shaklda saqlandi
+         phone = case when p_phone is null then u.phone else public.format_phone_uz(p_phone) end,
+         avatar_path = case
+           when p_avatar_path is null then u.avatar_path
+           when p_avatar_path = '' then null
+           else p_avatar_path
+         end
+   where u.id = auth.uid();
+  if not found then raise exception 'Profil topilmadi.' using errcode = 'P0002'; end if;
+end;
+$$;
+revoke all on function public.update_my_profile(text, text, text) from public;
+grant execute on function public.update_my_profile(text, text, text) to authenticated;
+
+
+-- ── Telefon raqami ustunlariga qat'iy tekshiruv ─────────────────────────────
+-- Yuqoridagi RPC va `create-staff` Edge Function'ni himoya qiladi, lekin ular
+-- majburiy yo'l emas: superadmin `grant update` orqali to'g'ridan-to'g'ri yozadi,
+-- mijozlar esa umuman `insert` qiladi. Shu sabab CHECK constraint ham kerak.
+--
+-- 1) Avval eski yozuvlarni kanonik shaklga keltiramiz. `format_phone_uz`
+--    idempotent bo'lgani uchun bu xavfsiz va takrorlangan shaklda ham xuddi
+--    shunday natija beradi. To'liq bo'lmagan raqamlar (masalan "+998 90 12")
+--    esa normalizatsiyadan keyin ham to'g'ri bo'lmaydi — ularni qo'lda
+--    ko'rib chiqish kerak (pastdagi so'rov).
+--
+-- 2) `not valid` — mavcut qatorlar o'sha qadamda tekshirilmaydi, ya'ni bu
+--    skript buzilgan ma'lumotni ham o'z-o'zidan o'chirmaydi. Lekin eslatma:
+--    `not valid` constraint YANGILANAYOTGAN qatorga ham qo'llaniladi. Shu sabab
+--    (1)-qadam bajarilmasdan constraint qo'shilsa, eski noto'g'ri raqamli xodimga
+--    keyin ism-familiyani o'zgartirish ham xato berib qo'yadi.
+update public.users set phone = public.format_phone_uz(phone)
+ where phone is not null and btrim(phone) <> ''
+   and public.format_phone_uz(phone) is distinct from phone;
+update public.clients set phone = public.format_phone_uz(phone)
+ where phone is not null and btrim(phone) <> ''
+   and public.format_phone_uz(phone) is distinct from phone;
+
+-- 3) Constraint qo'shilgandan keyin qolgan buzilgan qatorlarni topish:
+--
+--    select id, login, phone from public.users
+--     where phone is not null and btrim(phone) <> '' and not public.phone_is_valid_uz(phone);
+--    select id, name, phone from public.clients
+--     where phone is not null and btrim(phone) <> '' and not public.phone_is_valid_uz(phone);
+--
+--    Ularni to'g'rilang (yoki null qilib tozalang) — keyin constraintni
+--    tekshirishga yoqishingiz mumkin:
+--    alter table public.users validate constraint users_phone_format_check;
+--    alter table public.clients validate constraint clients_phone_format_check;
+alter table public.users
+  drop constraint if exists users_phone_format_check;
+alter table public.users
+  add constraint users_phone_format_check
+  check (public.phone_is_valid_uz(phone)) not valid;
+
+alter table public.clients
+  drop constraint if exists clients_phone_format_check;
+alter table public.clients
+  add constraint clients_phone_format_check
+  check (public.phone_is_valid_uz(phone)) not valid;
 
 
 -- Role permissions are replaced in one transaction, only with keys the caller already holds (the
@@ -871,6 +1034,33 @@ create policy maintenance_reports_insert_driver on public.maintenance_reports fo
 drop policy if exists maintenance_reports_update_manager on public.maintenance_reports;
 create policy maintenance_reports_update_manager on public.maintenance_reports for update to authenticated using (public.has_permission('fleet.manage')) with check (public.has_permission('fleet.manage'));
 
+-- ── Storage: profile avatars ──────────────────────────────────────────────
+-- Har bir xodimning rasmi aniq o'z papkasida saqlanadi: avatars/<user_id>/<fayl>.
+-- Bu shart siyosatlarda ham, `update_my_profile` RPC'sida ham tekshiriladi — shuning uchun
+-- bir xodim boshqasining rasmini o'z profiliga bog'lab ololmaydi.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', false, 2097152, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public = false, file_size_limit = 2097152, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists avatars_read on storage.objects;
+create policy avatars_read on storage.objects for select to authenticated using (
+  bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+);
+drop policy if exists avatars_insert on storage.objects;
+create policy avatars_insert on storage.objects for insert to authenticated with check (
+  bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+);
+drop policy if exists avatars_update on storage.objects;
+create policy avatars_update on storage.objects for update to authenticated using (
+  bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+) with check (
+  bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+);
+drop policy if exists avatars_delete on storage.objects;
+create policy avatars_delete on storage.objects for delete to authenticated using (
+  bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
+);
+
 -- ── Storage: private trip photos ──────────────────────────────────────────
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('trip-photos', 'trip-photos', false, 10485760, array['image/jpeg','image/png','image/webp','image/heic'])
@@ -897,8 +1087,10 @@ revoke insert, update, delete on public.role_permissions from authenticated;
 grant select on public.users to authenticated;
 -- Profil tahrirlash (ism, telefon, bo'lim, lavozim, holat) faqat users_update_staff siyosati
 -- orqali — ya'ni to'liq huquqli xodim uchun. Ustun darajasida berish butun jadvalni
--- ochmasligimiz uchun kerak: is_superadmin va driver_rate_per_trip o'zga tegishli RPC/tablolar orqali.
+-- ochmasligimiz uchun kerak: is_superadmin va driver_rate_per_trip o'zga tegishli RPC/tablalar orqali.
 grant update (full_name, phone, title, role_id, is_active) on public.users to authenticated;
+-- avatar_path ustuniga faqat `update_my_profile` RPC yozadi (security definer), shuning uchun
+-- authenticated roliga alohida grant berilmaydi.
 grant select, insert, update on public.clients to authenticated;
 grant select on public.materials to authenticated;
 grant insert on public.materials to authenticated;

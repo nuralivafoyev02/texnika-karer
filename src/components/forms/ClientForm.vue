@@ -1,18 +1,22 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { Info } from 'lucide-vue-next'
 import FormActions from './FormActions.vue'
+import PhoneField from './PhoneField.vue'
 import { captureAmountInput, parseAmountInput } from '../../lib/format'
+import { formatPhone, phoneProblem } from '../../lib/phone'
 
 const props = defineProps({ loading: Boolean })
 const emit = defineEmits(['submit', 'cancel'])
 const form = reactive({ name: '', contactName: '', phone: '', openingBalance: '' })
 const error = ref('')
 const onBalance = (event) => captureAmountInput(event, (value) => { form.openingBalance = value })
+const phoneError = computed(() => phoneProblem(form.phone))
 function submit() {
   error.value = ''
   if (!form.name.trim()) { error.value = 'Korxona yoki mijoz nomini kiriting.'; return }
-  emit('submit', { ...form, openingBalance: parseAmountInput(form.openingBalance) })
+  if (phoneError.value) { error.value = phoneError.value; return }
+  emit('submit', { ...form, phone: formatPhone(form.phone), openingBalance: parseAmountInput(form.openingBalance) })
 }
 </script>
 
@@ -21,7 +25,7 @@ function submit() {
     <div class="grid gap-4 sm:grid-cols-2">
       <label class="sm:col-span-2"><span class="label">Mijoz / korxona nomi</span><input v-model="form.name" class="field" placeholder="Masalan, Toshkent Yo‘l Qurilish" required /></label>
       <label><span class="label">Mas’ul shaxs</span><input v-model="form.contactName" class="field" placeholder="Ism familiya" /></label>
-      <label><span class="label">Telefon</span><input v-model="form.phone" class="field" type="tel" placeholder="+998 90 000 00 00" /></label>
+      <PhoneField v-model="form.phone" label="Telefon" hint="Aloqa uchun. +998 avtomatik qo‘shiladi." />
       <label class="sm:col-span-2"><span class="label">Boshlang‘ich balans</span><input :value="form.openingBalance" class="field" type="text" inputmode="text" autocomplete="off" placeholder="0" @input="onBalance" /><span class="mt-1 block text-[11px] text-muted">Musbat summa — mijoz qarzi; manfiy summa — mijoz avansi.</span></label>
     </div>
     <div class="mt-4 flex gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-[11px] leading-4 text-blue-800"><Info :size="15" class="mt-0.5 shrink-0" /><span>Keyingi reyslar va mijoz to‘lovlari balansni avtomatik hisoblaydi.</span></div>

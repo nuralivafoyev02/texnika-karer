@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { createDemoData } from '../lib/demo-data'
 import { isSameMonth, isToday, localDayKey } from '../lib/format'
+import { formatPhone } from '../lib/phone'
 import { FULL_ACCESS_KEYS, hasFullAccess } from '../lib/permissions'
 import { supabase, supabaseConfigured, toAuthEmail } from '../lib/supabase'
 
@@ -97,6 +98,8 @@ const mapUser = (row) => ({
   driverRatePerTrip: Number(row.driver_rate_per_trip ?? 0),
   isActive: row.is_active !== false,
   isSuperadmin: row.is_superadmin === true,
+  avatarPath: row.avatar_path ?? '',
+  avatarUrl: '',
 })
 const mapClient = (row) => ({
   id: row.id, name: row.name, phone: row.phone ?? '', contactName: row.contact_name ?? '',
@@ -386,6 +389,14 @@ export const useQuarryStore = defineStore('quarry', {
       this.remoteFinancialBalances = { cash: null, bank: null }
       this.loadedUserId = ''
     },
+    // Boshqa hisobga o'tganda eski profil rasmining signed URL'i ishlatilmasin —
+    // aks holda header'da birinchi xodimning rasmi ko'rinib turadi.
+    clearAvatarCache() {
+      for (const user of this.users) {
+        user.avatarUrl = ''
+        user.avatarUrlAt = 0
+      }
+    },
     // Cache'dan darhol ko'rsatish: to'liq yuklash kutinmaydi, interfeys zudlikda ochiladi.
     hydrateRemoteCache(userId) {
       const snapshot = readRemoteCache(userId)
@@ -400,6 +411,9 @@ export const useQuarryStore = defineStore('quarry', {
       if (!this.remoteMode) return
       const userId = this.session?.user?.id
       if (!userId || this.loadedUserId !== userId) return
+      // Profil rasmining signed URL'i vaqt bilan eskiradi; keshga saqlashdan oldin
+      // vaqtini tekshiramiz, aks holda eskirgan URL saqlanib qolardi.
+      this.clearAvatarCache()
       const snapshot = {
         version: 1,
         savedAt: Date.now(),
@@ -439,6 +453,7 @@ export const useQuarryStore = defineStore('quarry', {
           if (!nextSession) {
             this.resetRemoteState()
           } else if (!this.loading && !this.refreshing && nextSession.user.id !== this.loadedUserId) {
+            this.clearAvatarCache()
             setTimeout(() => this.loadRemoteData(), 0)
           }
         })
@@ -466,6 +481,115 @@ export const useQuarryStore = defineStore('quarry', {
         this.loadedUserId = ''
         throw loadError
       }
+    },
+    // ── O'z profili ─────────────────────────────────────────────────────────
+    // Profil rasmi: signed URL har 1 soat yangilanadi, shuning uchun `avatarUrl` ni
+    // keshga solamiz va faqat o'zi yo'q bo'lganda so'raymiz.
+    async ensureAvatarUrl(user = this.currentUser) {
+      if (!user) return ''
+      if (!this.remoteMode) return user.avatarUrl ?? ''
+      if (!user.avatarPath) return ''
+      if (user.avatarUrl && user.avatarUrlAt && Date.now() - user.avatarUrlAt < 50 * 60 * 1000) return user.avatarUrl
+      const { data, error } = await supabase.storage.from('avatars').createSignedUrl(user.avatarPath, 3600)
+      if (error) throw new Error(error.message)
+      user.avatarUrl = data?.signedUrl ?? ''
+      user.avatarUrlAt = Date.now()
+      return user.avatarUrl
+    },
+    // Ism-familiya / telefon / rasm. role_id va is_active bu yo'l bilan umuman
+    // o'zgartirilmaydi — shuning uchun xodim o'zini bloklamaydi.
+    async updateMyProfile(patch) {
+      const user = this.currentUser
+      if (!user) throw new Error('Sessiya topilmadi.')
+      const body = {}
+      if (patch.fullName !== undefined) {
+        const fullName = String(patch.fullName).trim()
+        if (fullName.length < 2) throw new Error('Ism-familiya kamida 2 ta belgidan iborat bo‘lishi kerak.')
+        body.full_name = fullName
+      }
+      // Bo'sh qiymat telefon raqamini o'chirishni bildiradi. RPC bo'yicha `null`
+      // "o'zgartirma" degan ma'noda, shuning uchun tozalash uchun bo'sh satn
+      // yuboriladi (server uni NULL ga aylantiradi). To'liq qiymat har doim
+      // "+998 90 123 45 67" shaklida saqlanadi.
+      if (patch.phone !== undefined) body.phone = formatPhone(patch.phone)
+      if (patch.avatarPath !== undefined) body.avatar_path = patch.avatarPath
+      if (!Object.keys(body).length) return
+      if (this.remoteMode) {
+        const { error } = await supabase.rpc('update_my_profile', body)
+        if (error) throw new Error(readableDbError(error, 'Profilni saqlab bo‘lmadi.'))
+        await this.loadRemoteData()
+        this.notify('Profilingiz yangilandi.')
+        return
+      }
+      if (body.full_name) user.fullName = body.full_name
+      if ('phone' in body) user.phone = body.phone
+      if ('avatar_path' in body) { user.avatarPath = body.avatar_path; user.avatarUrl = ''; user.avatarUrlAt = 0 }
+      this.persistDemo()
+      this.notify('Profilingiz yangilandi.')
+    },
+    // Profil rasmini yuklash. storage RLS faqat `avatars/<o'z user_id>/` papkasini ruxsat beradi.
+    async uploadAvatar(file) {
+      const user = this.currentUser
+      if (!user) throw new Error('Sessiya topilmadi.')
+      if (!file?.type?.startsWith('image/')) throw new Error('Faqat rasm fayli tanlang (JPG, PNG, WebP).')
+      if (file.size > 2 * 1024 * 1024) throw new Error('Rasm 2 MB dan kichik bo‘lishi kerak.')
+      // Fayl nomi va kengaytmasini tekshiramiz — yo'l storage'ga to'g'ri ketishi uchun
+      // o'zgartirilmaydi, yangi fayl esa eskisini almashtiradi (upsert).
+      const extension = String(file.name).split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+      if (!['jpg', 'jpeg', 'png', 'webp'].includes(extension)) {
+        throw new Error('Faqat JPG, PNG yoki WebP formatida rasm yuklang.')
+      }
+      const path = `avatars/${user.id}/avatar-${Date.now()}.${extension}`
+      if (!this.remoteMode) {
+        user.avatarPath = path
+        user.avatarUrl = URL.createObjectURL(file)
+        user.avatarUrlAt = Date.now()
+        this.persistDemo()
+        this.notify('Profil rasmi yangilandi (demo rejimida fayl saqlanmaydi).')
+        return
+      }
+      const { error: uploadError } = await supabase.storage.from('avatars')
+        .upload(path, file, { contentType: file.type, upsert: true })
+      if (uploadError) throw new Error(`Rasmni yuklab bo‘lmadi: ${uploadError.message}`)
+      await this.updateMyProfile({ avatarPath: path })
+      this.notify('Profil rasmi yangilandi.')
+    },
+    async removeAvatar() {
+      const user = this.currentUser
+      if (!user) throw new Error('Sessiya topilmadi.')
+      if (this.remoteMode && user.avatarPath) {
+        const { error } = await supabase.storage.from('avatars').remove([user.avatarPath])
+        if (error) throw new Error(`Rasmni o‘chira olmadim: ${error.message}`)
+      }
+      if (user.avatarUrl?.startsWith('blob:')) URL.revokeObjectURL(user.avatarUrl)
+      await this.updateMyProfile({ avatarPath: '' })
+    },
+    // Login va parol — Edge Function orqali (Auth email/hash'ini faqat service_role o'zgartiradi).
+    async updateMyAccount({ login, currentPassword, password }) {
+      const user = this.currentUser
+      if (!user) throw new Error('Sessiya topilmadi.')
+      const body = {}
+      const nextLogin = String(login ?? '').trim().toLowerCase()
+      if (nextLogin && nextLogin !== user.login) body.login = nextLogin
+      if (password) body.password = String(password).trim()
+      if (body.password && !currentPassword) throw new Error('Parolni o‘zgartirish uchun joriy parolni kiriting.')
+      if (!body.login && !body.password) throw new Error('Kamida bitta maydonni o‘zgartiring.')
+      if (!this.remoteMode) {
+        if (body.login) user.login = body.login
+        this.persistDemo()
+        this.notify(body.login
+          ? `Login “${body.login}” ga o‘zgartirildi (demo rejimida Auth ga ta’sir qilinmaydi).`
+          : 'Parol o‘zgartirildi (demo rejimida saqlanmaydi).')
+        return
+      }
+      if (body.password) body.currentPassword = String(currentPassword).trim()
+      const data = await invokeStaffFunction('update-my-account', body)
+      if (data?.login) user.login = data.login
+      this.notify(data?.passwordChanged && data?.login
+        ? 'Login va parol yangilandi. Yangi login bilan kiring.'
+        : data?.passwordChanged
+          ? 'Parolingiz yangilandi.'
+          : `Loginingiz “${data?.login}” ga o‘zgartirildi.`)
     },
     async signOut() {
       if (this.realtimeChannel) await supabase.removeChannel(this.realtimeChannel)
@@ -734,7 +858,7 @@ export const useQuarryStore = defineStore('quarry', {
       this.notify('Xarajat muvaffaqiyatli saqlandi.')
     },
     async createClient(payload) {
-      const row = { name: payload.name.trim(), phone: payload.phone?.trim() || null, contact_name: payload.contactName?.trim() || null, opening_balance: Number(payload.openingBalance || 0) }
+      const row = { name: payload.name.trim(), phone: formatPhone(payload.phone) || null, contact_name: payload.contactName?.trim() || null, opening_balance: Number(payload.openingBalance || 0) }
       if (this.remoteMode) {
         const { data, error } = await supabase.from('clients').insert(row).select('*').single()
         if (error) throw error
@@ -752,7 +876,7 @@ export const useQuarryStore = defineStore('quarry', {
       const request = {
         fullName: payload.fullName.trim(), login: String(payload.login || '').trim().toLowerCase(),
         password: payload.password || '', generatePassword: Boolean(payload.generatePassword),
-        phone: payload.phone?.trim() || '', title: payload.title?.trim() || '',
+        phone: formatPhone(payload.phone), title: payload.title?.trim() || '',
         roleId: payload.roleId, driverRatePerTrip: Number(payload.driverRatePerTrip || 0),
       }
       if (this.remoteMode) {
@@ -789,7 +913,7 @@ export const useQuarryStore = defineStore('quarry', {
       if (!this.canManageStaff) throw new Error('Xodimni tahrirlash huquqi faqat to‘liq huquqli (superadmin) xodimda bor.')
       const body = {
         full_name: patch.fullName?.trim() || undefined,
-        phone: patch.phone?.trim() || null,
+        phone: patch.phone === undefined ? undefined : (formatPhone(patch.phone) || null),
         title: patch.title?.trim() || null,
         role_id: patch.roleId || undefined,
         is_active: patch.isActive === undefined ? undefined : Boolean(patch.isActive),

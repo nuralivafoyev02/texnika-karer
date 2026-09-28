@@ -1,6 +1,6 @@
 import {
   authEmailFor, corsHeaders, generatePassword, json, LOGIN_PATTERN, normalizePassword, passwordProblem,
-  permissionKeysForRole, requireSuperadmin, schemaIsStale, serviceClient,
+  permissionKeysForRole, formatPhone, phoneProblem, requireSuperadmin, schemaIsStale, serviceClient,
 } from '../_shared/auth.ts'
 
 // Xodim qo'shish: login va parol shu zahotiyoq yaratiladi. Taklif xati, email tasdiqi
@@ -18,7 +18,9 @@ Deno.serve(async (request: Request) => {
 
   const fullName = String(input.fullName ?? '').trim().replace(/\s+/g, ' ')
   const login = String(input.login ?? '').trim().toLowerCase()
-  const phone = String(input.phone ?? '').trim()
+  // Kanonik shaklga keltiramiz: bu funksiya service-role orqali yozadi,
+  // shuning uchun frontend maskasi va RPC tekshiruvidan o'tmaydi.
+  const phone = formatPhone(input.phone)
   const jobTitle = String(input.title ?? '').trim()
   const roleId = String(input.roleId ?? '').trim()
   const driverRate = Number(input.driverRatePerTrip ?? 0)
@@ -27,6 +29,8 @@ Deno.serve(async (request: Request) => {
 
   if (fullName.length < 3) return json({ error: 'Xodimning to‘liq ismini kiriting.' }, 400)
   if (!LOGIN_PATTERN.test(login)) return json({ error: 'Login 3–32 ta belgidan iborat bo‘lsin: kichik harf, raqam, nuqta, chiziqcha.' }, 400)
+  const phoneIssue = phoneProblem(phone)
+  if (phoneIssue) return json({ error: phoneIssue }, 400)
   if (!roleId) return json({ error: 'Lavozimni tanlang.' }, 400)
   if (!Number.isFinite(driverRate) || driverRate < 0) return json({ error: 'Reys stavkasini tekshiring.' }, 400)
   if (wantsGenerated && typedPassword) return json({ error: 'Avtomatik parol tanlangan — parol maydonini bo‘sh qoldiring.' }, 400)

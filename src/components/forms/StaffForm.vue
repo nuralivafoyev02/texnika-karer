@@ -2,9 +2,11 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { Info, KeyRound, RefreshCw, Eye, EyeOff, Copy, ShieldCheck } from 'lucide-vue-next'
 import FormActions from './FormActions.vue'
+import PhoneField from './PhoneField.vue'
 import { INTERNAL_DOMAIN } from '../../lib/supabase'
 import { useQuarryStore } from '../../stores/quarry'
 import { formatAmountInput, parseAmountInput, captureAmountInput } from '../../lib/format'
+import { formatPhone, phoneProblem } from '../../lib/phone'
 
 const props = defineProps({
   roles: { type: Array, default: () => [] },
@@ -38,7 +40,7 @@ watch(() => props.user, (user) => {
   if (!user) return
   Object.assign(form, {
     fullName: user.fullName ?? '', login: user.login ?? '', password: '',
-    phone: user.phone ?? '', title: user.title ?? '',    roleId: user.roleId,
+    phone: formatPhone(user.phone), title: user.title ?? '', roleId: user.roleId,
     driverRatePerTrip: formatAmountInput(Number(user.driverRatePerTrip || 0)), isActive: user.isActive !== false,
   })
 }, { immediate: true })
@@ -61,6 +63,7 @@ const loginProblem = computed(() => {
   if (!LOGIN_PATTERN.test(form.login.toLowerCase())) return 'Login: kichik harf, raqam, nuqta yoki chiziqcha (3–32 belgi).'
   return ''
 })
+const phoneError = computed(() => phoneProblem(form.phone))
 const loginHint = computed(() => (form.login ? `${form.login.toLowerCase()}@${INTERNAL_DOMAIN}` : `@${INTERNAL_DOMAIN} bilan yakunlanadi`))
 
 function randomPassword() {
@@ -76,8 +79,10 @@ function submit() {
   if (loginProblem.value) { error.value = loginProblem.value; return }
   if (!isEdit.value && !form.roleId) { error.value = 'Lavozimni tanlang.'; return }
   if (passwordProblem.value) { error.value = passwordProblem.value; return }
+  if (phoneError.value) { error.value = phoneError.value; return }
   emit('submit', {
     ...form,
+    phone: formatPhone(form.phone),
     login: form.login.toLowerCase(),
     password: form.password,
     generatePassword: false,
@@ -99,7 +104,7 @@ function submit() {
         </div>
         <span class="mt-1 block text-[10px] text-muted">Xodim shu parol bilan kiradi — uni o‘ziga yetkazing. Kamida 8 ta belgi, katta/kichik harf va raqamlar aralash bo‘lsin.</span>
       </label>
-      <label><span class="label">Telefon</span><input v-model="form.phone" class="field" type="tel" placeholder="+998 90 000 00 00" /></label>
+      <PhoneField v-model="form.phone" label="Telefon" hint="Xodim bilan bog‘lanish uchun. +998 avtomatik qo‘shiladi." />
       <label><span class="label">Lavozim bo‘limi</span><input v-model="form.title" class="field" :placeholder="selectedRole?.name || 'Masalan: qurilma bo‘limi boshlig‘i'" /></label>
       <label class="sm:col-span-2"><span class="label">Lavozim (ruxsatlar shundan kelib chiqadi)</span><select v-model="form.roleId" class="field" required :disabled="isSelf"><option value="" disabled>Lavozimni tanlang</option><option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option></select>
         <span v-if="grantsFullAccess" class="mt-1 flex items-center gap-1 text-[10px] font-semibold text-[#b77824]"><ShieldCheck :size="11" /> Bu lavozim to‘liq huquqli: xodim superadmin bo‘ladi va xodim/lavozim boshqarishiga kiradi.</span>

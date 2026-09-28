@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Plus, Search, UsersRound, ArrowDownLeft, ArrowUpRight, HandCoins, Phone, CircleDollarSign, ChevronRight, Building2 } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import ClientForm from '../components/forms/ClientForm.vue'
+import { phoneHref } from '../lib/phone'
 import PaymentForm from '../components/forms/PaymentForm.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { initials, money } from '../lib/format'
@@ -57,7 +58,7 @@ function openPayment(clientId = '') { selectedClientId.value = clientId; showPay
           <tbody><tr v-for="client in clients" :key="client.id" class="border-b border-[#f0f2f0] last:border-0 hover:bg-[#fbfcfb]">
             <td class="px-5 py-4"><div class="flex items-center gap-3"><div class="avatar" :class="client.balance < 0 ? 'avatar-blue' : ''">{{ initials(client.name) }}</div><div class="max-w-[230px]"><p class="truncate text-xs font-bold text-ink">{{ client.name }}</p><p class="mt-1 text-[10px] text-muted">Mijoz ID · {{ String(client.id).slice(-5).toUpperCase() }}</p></div></div></td>
             <td class="px-4 py-4"><p class="text-xs text-ink">{{ client.contactName || '—' }}</p></td>
-            <td class="px-4 py-4"><a v-if="client.phone" :href="`tel:${client.phone}`" class="flex items-center gap-1.5 text-xs text-muted hover:text-leaf"><Phone :size="13" />{{ client.phone }}</a><span v-else class="text-xs text-muted">—</span></td>
+            <td class="px-4 py-4"><a v-if="client.phone" :href="phoneHref(client.phone)" class="flex items-center gap-1.5 text-xs text-muted hover:text-leaf"><Phone :size="13" />{{ client.phone }}</a><span v-else class="text-xs text-muted">—</span></td>
             <td class="px-4 py-4"><span v-if="client.balance > 0" class="inline-flex items-center gap-1.5 rounded-lg bg-[#fff0ee] px-2 py-1 text-[10px] font-bold text-[#bd594d]"><ArrowDownLeft :size="12" /> Qarzdor</span><span v-else-if="client.balance < 0" class="inline-flex items-center gap-1.5 rounded-lg bg-[#eaf5ee] px-2 py-1 text-[10px] font-bold text-leaf"><ArrowUpRight :size="12" /> Avans bor</span><span v-else class="rounded-lg bg-canvas px-2 py-1 text-[10px] font-semibold text-muted">Hisob yopiq</span></td>
             <td class="px-5 py-4 text-right"><span class="text-sm font-bold" :class="client.balance > 0 ? 'text-[#bd594d]' : client.balance < 0 ? 'text-leaf' : 'text-ink'">{{ money(Math.abs(client.balance), { short: true }) }}</span><p v-if="client.balance < 0" class="mt-0.5 text-[9px] text-muted">mijoz foydasiga</p></td>
             <td class="px-5 py-4 text-right"><button v-if="store.can('finance.payments.create')" class="btn-quiet !rounded-lg !px-2.5 !py-2 text-[10px]" @click="openPayment(client.id)"><HandCoins :size="14" /> To‘lov</button><span v-else class="text-slate-300"><ChevronRight :size="16" /></span></td>

@@ -33,6 +33,45 @@ export const generatePassword = (length = 11) => {
   return Array.from(bytes, (byte) => ALPHABET[byte % ALPHABET.length]).join('')
 }
 
+// ── Telefon raqami ──────────────────────────────────────────────────────────
+// Xuddi shakl `src/lib/phone.js` va bazadagi `format_phone_uz()` bilan: barcha
+// uch joy bitta kanonik "+998 90 123 45 67" shaklini qo'llaydi. Bu funksiya
+// service-role orqali yozadi, shuning uchun frontend maskasi va RPC tekshiruvidan
+// o'tmaydi — shuning uchun shu yerda ham tekshirilishi shart.
+const UZ_CODE = '998'
+const NATIONAL_LENGTH = 9
+
+const nationalDigits = (value: unknown) => {
+  const text = String(value ?? '')
+  const digits = text.replace(/\D/g, '')
+  const isCountryCode = digits.startsWith(UZ_CODE)
+    && (text.trim().startsWith('+') || digits.length > NATIONAL_LENGTH)
+  return (isCountryCode ? digits.slice(UZ_CODE.length) : digits).slice(0, NATIONAL_LENGTH)
+}
+
+export const formatPhone = (value: unknown) => {
+  const body = nationalDigits(value)
+  if (!body) return ''
+  return `+${UZ_CODE} ${[
+    body.slice(0, 2),
+    body.slice(2, 5),
+    body.slice(5, 7),
+    body.slice(7, 9),
+  ].filter(Boolean).join(' ')}`
+}
+
+export const phoneProblem = (value: unknown) => {
+  const text = String(value ?? '')
+  const body = nationalDigits(text)
+  if (!body) return text.trim() ? 'Telefon raqamini kiriting.' : ''
+  if (text.replace(/\D/g, '').length > UZ_CODE.length + NATIONAL_LENGTH) {
+    return `Telefon raqami ${UZ_CODE.length + NATIONAL_LENGTH} ta raqamdan oshmasligi kerak.`
+  }
+  const missing = NATIONAL_LENGTH - body.length
+  if (missing > 0) return `Raqam yana ${missing} ta raqamga to‘ldirilishi kerak.`
+  return ''
+}
+
 type Caller = { id: string; roleId: string; roleName: string; isSuperadmin: boolean }
 
 // ── To'liq dostugni aniqlash ────────────────────────────────────────────────
@@ -85,6 +124,44 @@ export const requireSuperadmin = async (request: Request): Promise<Caller | Resp
 
   const { data: role } = await admin.from('roles').select('id,name').eq('id', profile.role_id).single()
   return { id: profile.id, roleId: profile.role_id, roleName: role?.name ?? '', isSuperadmin }
+}
+
+// ── Oddiy xodimni aniqlash ───────────────────────────────────────────────────
+// Xodim o'z profilini tahrirlash uchun superadmin bo'lishi shart emas — shuning uchun
+// requireSuperadmin bu yerga mos kelmaydi. Faqat "kimdir tizimga kirdimi" tekshiriladi.
+export const requireUser = async (request: Request): Promise<Caller | Response> => {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) return json({ error: 'Server sozlamalari to‘liq emas.' }, 500)
+
+  const authorization = request.headers.get('Authorization')
+  if (!authorization) return json({ error: 'Kirish sessiyasi talab qilinadi.' }, 401)
+
+  const callerClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } })
+  const { data: authData, error: authError } = await callerClient.auth.getUser()
+  if (authError || !authData.user) return json({ error: 'Sessiya haqiqiy emas.' }, 401)
+
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { data: profile, error: profileError } = await admin
+    .from('users').select('id,role_id,is_active,is_superadmin').eq('id', authData.user.id).single()
+  if (profileError) {
+    if (schemaIsStale(profileError.message)) {
+      return json({ error: 'Server sxemasi eskirgan: supabase/schema.sql faylini qayta ishga tushiring.' }, 500)
+    }
+    return json({ error: 'Xodim profili topilmadi.' }, 403)
+  }
+  if (!profile) return json({ error: 'Xodim profili topilmadi.' }, 403)
+  if (!profile.is_active) return json({ error: 'Hisobingiz faol emas. Administratorga murojaat qiling.' }, 403)
+
+  const { fullAccess } = await permissionKeysForRole(admin, profile.role_id)
+  const { data: role } = await admin.from('roles').select('id,name').eq('id', profile.role_id).single()
+  return {
+    id: profile.id,
+    roleId: profile.role_id,
+    roleName: role?.name ?? '',
+    isSuperadmin: profile.is_superadmin === true || fullAccess,
+  }
 }
 
 export const serviceClient = () => createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
