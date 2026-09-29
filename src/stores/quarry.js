@@ -289,6 +289,13 @@ export const useQuarryStore = defineStore('quarry', {
     expenseCategories(state) {
       return state.categories.filter((item) => item.direction === 'out' && item.isActive !== false)
     },
+    // Haydovchi roli bor xodimlar — texnika biriktirish uchun.
+    // Getter bo'lishi SHART: action bo'lsa `store.drivers` funksiya bo'lib qoladi,
+    // VehicleForm dagi select esa massiv kutadi — natijada ro'yxat bo'sh chiqardi
+    // va texnikaga haydovchi biriktirib bo'lmasdi (xuddi canManageStaff kabi).
+    drivers() {
+      return this.users.filter((user) => user.isActive !== false && this.userCan(user, 'driver.self'))
+    },
   },
   actions: {
     // Router shu yerda kutadi: sessiya va birinchi ma'lumot hali kelmaganda
@@ -941,8 +948,9 @@ export const useQuarryStore = defineStore('quarry', {
       if (this.users.some((user) => user.login === request.login)) throw new Error('Bu login allaqachon band.')
       // To'liq huquqli lavozim berilsa, demo rejimida ham xodim superadmin bo'ladi.
       const grantedFullAccess = this.roleHasFullAccess(role.id)
+      const userId = makeId('U')
       this.users.push({
-        id: makeId('U'), fullName: request.fullName, login: request.login,
+        id: userId, fullName: request.fullName, login: request.login,
         email: toAuthEmail(request.login), phone: request.phone, roleId: role.id,
         title: request.title || role.name, driverRatePerTrip: request.driverRatePerTrip,
         isActive: true, isSuperadmin: grantedFullAccess,
@@ -951,7 +959,10 @@ export const useQuarryStore = defineStore('quarry', {
       this.notify(grantedFullAccess
         ? `${request.fullName} — to‘liq huquqli lavozim bilan qo‘shildi, superadmin sifatida boshqaradi.`
         : 'Demo rejimida xodim ro‘yxatiga qo‘shildi.')
-      return { ok: true, login: request.login, isSuperadmin: grantedFullAccess }
+      // userId/password ham qaytariladi: shunda FleetView yangi haydovchini
+      // shu zahoti texnikaga biriktiradi va login/parol oynasi ochiladi
+      // (remote rejimidagi create-staff bilan bir xil xatti-harakat).
+      return { ok: true, userId, login: request.login, password: request.password || '', fullName: request.fullName, isSuperadmin: grantedFullAccess }
     },
     async setStaffPassword(userId, password) {
       if (!this.canManageStaff) throw new Error('Parolni o‘zgartirish huquqi faqat to‘liq huquqli (superadmin) xodimda bor.')
@@ -1158,10 +1169,6 @@ export const useQuarryStore = defineStore('quarry', {
       this.categories = this.categories.filter((item) => item.id !== categoryId)
       this.persistDemo()
       this.notify(`“${category.label}” turi o‘chirildi.`)
-    },
-    // Haydovchi roli bor xodimlar — texnika biriktirish uchun.
-    drivers() {
-      return this.users.filter((user) => user.isActive !== false && this.userCan(user, 'driver.self'))
     },
     async createVehicle(payload) {
       if (!this.can('fleet.manage')) throw new Error('Texnika qo‘shish huquqi yo‘q.')

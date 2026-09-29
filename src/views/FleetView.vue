@@ -20,6 +20,9 @@ const showDriver = ref(false)
 const saving = ref(false)
 const credentials = ref(null)
 const copied = ref(false)
+// Yangi yaratilgan haydovchi — texnika formasi ochiq turganda uning select'iga
+// avtomatik tanlab qo'yiladi (yangi reys/qo'shish oynasida ham).
+const newDriverId = ref('')
 
 const canManage = computed(() => store.can('fleet.manage'))
 const drivers = computed(() => store.drivers)
@@ -59,6 +62,10 @@ async function createDriver(payload) {
     if (result?.userId && editing.value?.id) {
       await store.updateVehicle(editing.value.id, { ...editing.value, driverId: result.userId })
       editing.value = { ...editing.value, driverId: result.userId }
+    } else if (result?.userId) {
+      // Texnika hali yaratilmagan bo'lsa (qo'shish oynasi) — formada tanlab qo'yamiz,
+      // foydalanuvchi saqlash tugmasini bosadi.
+      newDriverId.value = result.userId
     }
   } catch (error) { notify(error.message || 'Haydovchini qo‘shib bo‘lmadi.') }
   finally { saving.value = false }
@@ -78,8 +85,10 @@ async function copyCredentials() {
     setTimeout(() => { copied.value = false }, 2000)
   } catch { notify('Kiritishga ruxsat berilmadi: matnni qo‘lda ko‘chiring.') }
 }
-function openCreate() { editing.value = null; showCreate.value = true }
-function openDriverForm() { showCreate.value = false; showDriver.value = true }
+function openCreate() { editing.value = null; newDriverId.value = ''; showCreate.value = true }
+// Texnika formasi yopilmaydi: haydovchi yaratilgach foydalanuvchi o'sha formada
+// davom etadi (avval eshakchalak qilib qo'yardi).
+function openDriverForm() { showDriver.value = true }
 </script>
 
 <template>
@@ -158,10 +167,10 @@ function openDriverForm() { showCreate.value = false; showDriver.value = true }
     </section>
 
     <ModalDialog v-model="showCreate" title="Yangi texnika qo‘shish" description="Raqam, marka va haydovchini kiriting.">
-      <VehicleForm :drivers="drivers" :can-add-driver="store.canManageStaff" :loading="saving" @submit="create" @add-driver="openDriverForm" @cancel="showCreate = false" />
+      <VehicleForm :drivers="drivers" :initial-driver-id="newDriverId" :can-add-driver="store.canManageStaff" :loading="saving" @submit="create" @add-driver="openDriverForm" @cancel="showCreate = false" />
     </ModalDialog>
     <ModalDialog :model-value="Boolean(editing)" title="Texnikani tahrirlash" description="Ma’lumot va haydovchini yangilang." @update:model-value="editing = null">
-      <VehicleForm v-if="editing" :key="`${editing.id}-${editing.driverId || 'none'}`" :drivers="drivers" :user="editing" :can-add-driver="store.canManageStaff" :loading="saving" @submit="save" @add-driver="openDriverForm" @cancel="editing = null" />
+      <VehicleForm v-if="editing" :key="`${editing.id}-${editing.driverId || 'none'}`" :drivers="drivers" :initial-driver-id="newDriverId" :user="editing" :can-add-driver="store.canManageStaff" :loading="saving" @submit="save" @add-driver="openDriverForm" @cancel="editing = null" />
     </ModalDialog>
     <ModalDialog v-model="showDriver" title="Yangi haydovchi qo‘shish" description="Login va parol shu zahotiyoq yaratiladi." width="max-w-2xl">
       <StaffForm :roles="store.roles" :initial-role-id="driverRole" :demo-mode="!store.remoteMode" :loading="saving" @submit="createDriver" @cancel="showDriver = false" />

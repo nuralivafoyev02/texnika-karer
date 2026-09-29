@@ -7,6 +7,7 @@ import {
 } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import VehicleForm from '../components/forms/VehicleForm.vue'
+import StaffForm from '../components/forms/StaffForm.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { money, number, dateTime, initials } from '../lib/format'
 import { sectionShort } from '../lib/guide'
@@ -23,6 +24,12 @@ const latestTrip = ref(null)
 const fileInput = ref(null)
 const showVehicle = ref(false)
 const vehicleSaving = ref(false)
+// Texnika oynasidagi "+ haydovchi" tugmasi: shu yerda haydovchi yaratiladi va
+// forma ochiq turganligi uchun yangi haydovchi avtomatik tanlab qo'yiladi.
+const showDriver = ref(false)
+const newDriverId = ref('')
+const credentials = ref(null)
+const driverRole = computed(() => store.roles.find((role) => role.permissions?.includes('driver.self'))?.id ?? '')
 const activeVehicles = computed(() => store.vehicles.filter((vehicle) => vehicle.status === 'active'))
 const selectedVehicle = computed(() => store.vehicles.find((vehicle) => vehicle.id === form.vehicleId))
 const selectedDriver = computed(() => store.users.find((user) => user.id === selectedVehicle.value?.driverId))
@@ -43,6 +50,16 @@ async function addVehicle(payload) {
     showVehicle.value = false
     if (vehicle?.id) form.vehicleId = vehicle.id
   } catch (err) { error.value = err.message || 'Texnika qo‘shib bo‘lmadi.' }
+  finally { vehicleSaving.value = false }
+}
+async function addDriver(payload) {
+  vehicleSaving.value = true
+  try {
+    const result = await store.createStaff(payload)
+    showDriver.value = false
+    if (result?.userId) newDriverId.value = result.userId
+    if (result?.password) credentials.value = { login: result.login, password: result.password, name: result.fullName || payload.fullName }
+  } catch (err) { store.notify(err.message || 'Haydovchini qo‘shib bo‘lmadi.', 'error') }
   finally { vehicleSaving.value = false }
 }
 function choosePhoto(event) {
@@ -153,7 +170,16 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
       </aside>
     </form>
     <ModalDialog v-model="showVehicle" title="Yangi texnika qo‘shish" description="Reys kiritish uchun samosval kerak.">
-      <VehicleForm :drivers="store.drivers" :can-add-driver="store.canManageStaff" :loading="vehicleSaving" @submit="addVehicle" @cancel="showVehicle = false" />
+      <VehicleForm :drivers="store.drivers" :initial-driver-id="newDriverId" :can-add-driver="store.canManageStaff" :loading="vehicleSaving" @submit="addVehicle" @add-driver="showDriver = true" @cancel="showVehicle = false" />
+    </ModalDialog>
+    <ModalDialog v-model="showDriver" title="Yangi haydovchi qo‘shish" description="Login va parol shu zahotiyoq yaratiladi." width="max-w-2xl">
+      <StaffForm :roles="store.roles" :initial-role-id="driverRole" :demo-mode="!store.remoteMode" :loading="vehicleSaving" @submit="addDriver" @cancel="showDriver = false" />
+    </ModalDialog>
+    <ModalDialog :model-value="Boolean(credentials)" title="Xodim tizimga tayyor" description="Login va parolni xodimga yetkazing." @update:model-value="credentials = null">
+      <div class="space-y-4">
+        <div class="rounded-2xl border border-mint bg-[#f4f9ff] p-4"><p class="text-[10px] font-bold uppercase tracking-wide text-muted">{{ credentials?.name }}</p><dl class="mt-3 space-y-2 text-sm"><div class="flex items-center justify-between gap-3"><dt class="text-muted">Login</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.login }}</code></dd></div><div class="flex items-center justify-between gap-3"><dt class="text-muted">Parol</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.password }}</code></dd></div></dl></div>
+        <div class="flex justify-end gap-2"><button class="btn-secondary" type="button" @click="credentials = null">Yopish</button></div>
+      </div>
     </ModalDialog>
   </div>
 </template>

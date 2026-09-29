@@ -49,7 +49,7 @@ button:disabled {
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-leaf px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-forest focus:outline-none focus:ring-4 focus:ring-blue-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100;
   }
 
   .btn-secondary {
@@ -107,7 +107,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  background: rgba(255, 255, 255, .88);
+  background: #ffffffe0;
   border-bottom: 1px solid #e8edf4;
   position: sticky;
   top: 0;

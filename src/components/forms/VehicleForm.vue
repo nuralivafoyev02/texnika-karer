@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Truck, UserRoundPlus } from 'lucide-vue-next'
 import FormActions from './FormActions.vue'
 
@@ -8,11 +8,17 @@ const props = defineProps({
   loading: Boolean,
   user: { type: Object, default: null },
   canAddDriver: Boolean,
+  // Yaratilgan yangi haydovchi: forma ochiq turganda shu qiymat avtomatik tanlanadi.
+  initialDriverId: { type: String, default: '' },
 })
 const emit = defineEmits(['submit', 'cancel', 'add-driver'])
 const isEdit = Boolean(props.user)
 const form = reactive({ plate: '', model: '', year: '', status: 'active', driverId: '' })
 const error = ref('')
+// Himoya qatlami: `drivers` noto'g'ri (masalan, funksiya) bo'lib kelsa ham
+// select bo'sh variantlar bilan ishlayveradi va UI sinmaydi.
+const driverOptions = computed(() => (Array.isArray(props.drivers) ? props.drivers : []))
+watch(() => props.initialDriverId, (value) => { if (value) form.driverId = value })
 
 watch(() => props.user, (user) => {
   if (!user) return
@@ -47,7 +53,7 @@ function submit() {
         <div class="flex gap-2">
           <select v-model="form.driverId" class="field flex-1">
             <option value="">Biriktirilmagan</option>
-            <option v-for="person in drivers" :key="person.id" :value="person.id">{{ person.fullName }}{{ person.phone ? ` · ${person.phone}` : '' }}</option>
+            <option v-for="person in driverOptions" :key="person.id" :value="person.id">{{ person.fullName }}{{ person.phone ? ` · ${person.phone}` : '' }}</option>
           </select>
           <button v-if="canAddDriver" type="button" class="btn-secondary shrink-0 !px-3" title="Yangi haydovchi qo‘shish" @click="emit('add-driver')"><UserRoundPlus :size="16" /></button>
         </div>
