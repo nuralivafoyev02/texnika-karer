@@ -36,7 +36,8 @@ const groups = computed(() => {
   <aside class="sidebar">
     <div class="brand-lockup">
       <div class="brand-mark"><span></span><span></span><span></span></div>
-      <div class="brand-copy"><strong>AliBuilding<span style="color:#7db3ff">.uz</span></strong><small>TEXNIKA BOSHQARUVI</small></div>
+      <div class="brand-copy"><strong>AliBuilding<span style="color:#7db3ff">.uz</span></strong><small>TEXNIKA
+          BOSHQARUVI</small></div>
     </div>
     <nav class="sidebar-scroll" aria-label="Asosiy navigatsiya">
       <section v-for="group in groups" :key="group.title">
@@ -54,7 +55,7 @@ const groups = computed(() => {
         <span>{{ store.remoteMode ? 'Supabase bilan ulangan' : 'Demo ma’lumotlar rejimi' }}</span>
       </div> -->
       <div class="mt-0 flex items-center justify-center px-0.5 text-[10px] text-[#7f9cc4]">
-        <span class="text-center font-semibold">v1.6.5</span>
+        <span class="text-center font-semibold">v1.6.6</span>
       </div>
     </div>
   </aside>
