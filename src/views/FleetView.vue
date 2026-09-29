@@ -150,7 +150,7 @@ function openDriverForm() { showCreate.value = false; showDriver.value = true }
         <div v-if="!vehicles.length" class="rounded-2xl border border-dashed border-line px-6 py-12 text-center md:col-span-2 xl:col-span-3">
           <Truck :size="22" class="mx-auto mb-2 text-slate-400" />
           <p class="text-sm font-semibold text-ink">{{ store.vehicles.length ? 'Filtrga mos texnika yo‘q' : 'Park bo‘sh' }}</p>
-          <p class="mt-1 text-xs text-muted">{{ store.vehicles.length ? 'Qidiruv yoki filtrni o‘zgartiring.' : 'Birinchi samosvalni qo‘shing — rey s uchun kerak.' }}</p>
+          <p class="mt-1 text-xs text-muted">{{ store.vehicles.length ? 'Qidiruv yoki filtrni o‘zgartiring.' : 'Birinchi samosvalni qo‘shing.' }}</p>
           <button v-if="canManage && !store.vehicles.length" class="btn-primary mt-4" @click="openCreate"><Plus :size="16" /> Texnika qo‘shish</button>
         </div>
       </div>

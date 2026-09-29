@@ -138,7 +138,7 @@ watch(searchTerm, () => {
 })
 
 function onShortcut(event) {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'K') {
     event.preventDefault()
     suggestionsDismissed.value = false
     searchField.value?.focus()

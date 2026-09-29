@@ -74,7 +74,7 @@ async function openPhoto(trip) {
           </tbody>
         </table>
       </div>
-      <footer class="flex items-center justify-between border-t border-line px-5 py-3 text-[10px] text-muted"><span>{{ filteredTrips.length }} ta yozuv ko‘rsatildi</span><span>Reys tasdiqlangach, uning narxi tarixda o‘zgarmaydi.</span></footer>
+      <footer class="flex items-center justify-between border-t border-line px-5 py-3 text-[10px] text-muted"><span>{{ filteredTrips.length }} ta yozuv ko‘rsatildi</span></footer>
     </section>
 
     <ModalDialog :model-value="Boolean(selectedPhoto)" title="Yuk fotosurati" description="Reysga biriktirilgan tasdiqlovchi surat." width="max-w-2xl" @update:model-value="(value) => { if (!value) selectedPhoto = null }">

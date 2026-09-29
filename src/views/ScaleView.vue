@@ -94,11 +94,11 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
           <div class="grid gap-4 sm:grid-cols-2">
             <label><span class="label">Samosval</span><div class="relative"><Truck :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-leaf" /><select v-model="form.vehicleId" class="field appearance-none pl-10 pr-9" required><option value="" disabled>Texnikani tanlang</option><option v-for="vehicle in activeVehicles" :key="vehicle.id" :value="vehicle.id">{{ vehicle.plate }} · {{ vehicle.model }}</option></select><ChevronDown :size="14" class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" /></div></label>
             <div v-if="!activeVehicles.length" class="rounded-xl border border-dashed border-[#e8d3ae] bg-[#fff9ef] px-3 py-2.5 sm:col-span-2"><p class="text-[11px] font-semibold text-[#96621d]">Reys uchun faol texnika kerak.</p><button v-if="store.can('fleet.manage')" class="btn-secondary mt-2 !border-[#e8d3ae] !bg-white !text-[#96621d]" @click="showVehicle = true"><Plus :size="14" /> Texnika qo‘shish</button></div>
-            <div v-else><span class="label">Biriktirilgan haydovchi</span><div class="flex h-[42px] items-center gap-2.5 rounded-xl border border-line bg-[#f8faf8] px-3"><div class="avatar avatar-small avatar-driver">{{ initials(selectedDriver?.fullName) }}</div><div class="min-w-0"><p class="truncate text-xs font-semibold text-ink">{{ selectedDriver?.fullName || 'Haydovchi biriktirilmagan' }}</p><p class="mt-0.5 text-[9px] text-muted">{{ selectedDriver?.phone || 'Transport profilidan olinadi' }}</p></div></div></div>
+            <div v-else><span class="label">Biriktirilgan haydovchi</span><div class="flex h-[42px] items-center gap-2.5 rounded-xl border border-line bg-[#f8faf8] px-3"><div class="avatar avatar-small avatar-driver">{{ initials(selectedDriver?.fullName) }}</div><div class="min-w-0"><p class="truncate text-xs font-semibold text-ink">{{ selectedDriver?.fullName || 'Haydovchi biriktirilmagan' }}</p><p class="mt-0.5 text-[9px] text-muted">{{ selectedDriver?.phone || 'Telefon kiritilmagan' }}</p></div></div></div>
           </div>
 
           <div>
-            <div class="mb-2 flex items-center justify-between"><span class="label !mb-0">Mijoz / sotuv turi</span><span class="text-[10px] text-muted">Tanlovga qarab balans yuritiladi</span></div>
+            <div class="mb-2 flex items-center justify-between"><span class="label !mb-0">Mijoz / sotuv turi</span></div>
             <div class="grid gap-2 sm:grid-cols-2">
               <button type="button" :class="form.saleType === 'credit' ? 'border-leaf bg-mint/70 ring-2 ring-emerald-50' : 'border-line bg-white hover:bg-canvas'" class="flex items-center gap-3 rounded-xl border p-3.5 text-left" @click="form.saleType = 'credit'"><div class="grid h-9 w-9 place-items-center rounded-xl bg-white text-leaf"><UsersRound :size="17" /></div><span><strong class="block text-xs text-ink">Mijozga hisobga</strong><small class="mt-1 block text-[10px] text-muted">Balansga qarz sifatida yoziladi</small></span><span class="ml-auto h-4 w-4 rounded-full border" :class="form.saleType === 'credit' ? 'border-[5px] border-leaf bg-white' : 'border-slate-300'"></span></button>
               <button type="button" :class="form.saleType === 'cash' ? 'border-leaf bg-mint/70 ring-2 ring-emerald-50' : 'border-line bg-white hover:bg-canvas'" class="flex items-center gap-3 rounded-xl border p-3.5 text-left" @click="form.saleType = 'cash'"><div class="grid h-9 w-9 place-items-center rounded-xl bg-white text-amber"><Coins :size="17" /></div><span><strong class="block text-xs text-ink">Naqd savdo</strong><small class="mt-1 block text-[10px] text-muted">Tushum kassaga qo‘shiladi</small></span><span class="ml-auto h-4 w-4 rounded-full border" :class="form.saleType === 'cash' ? 'border-[5px] border-leaf bg-white' : 'border-slate-300'"></span></button>
@@ -116,7 +116,6 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
             </div>
           </div>
           <div v-if="error" class="rounded-xl border border-red-100 bg-red-50 px-3.5 py-3 text-xs font-semibold text-danger">{{ error }}</div>
-          <div v-if="!activeVehicles.length" class="rounded-xl border border-[#f2dfc2] bg-[#fff9ef] px-3.5 py-3 text-xs font-semibold text-[#956320]">Faol samosval yo‘q. Reysdan oldin texnikani ish holatiga qaytaring.</div>
         </div>
       </section>
 
@@ -126,7 +125,7 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
           <div class="px-5 py-5"><div class="flex items-end justify-between gap-3"><div><p class="text-[10px] text-white/65">Umumiy qiymati</p><p class="mt-1 text-[27px] font-bold tracking-tight">{{ money(amount, { currency: false }) }}<span class="ml-1 text-xs font-semibold text-white/60">so‘m</span></p></div><div class="mb-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-[10px] font-semibold text-[#d2ead9]">{{ selectedMaterial ? money(selectedMaterial.unitPrice) : 'Narx yo‘q' }} / t</div></div>
             <div class="mt-5 space-y-2 border-t border-white/10 pt-4 text-xs"><div class="flex justify-between text-white/65"><span>Og‘irlik</span><strong class="font-semibold text-white">{{ number(form.weightTons, 1) }} t</strong></div><div class="flex justify-between text-white/65"><span>Mahsulot</span><strong class="font-semibold text-white">{{ selectedMaterial?.name || 'Tanlanmagan' }}</strong></div><div class="flex justify-between text-white/65"><span>Sotuv turi</span><strong class="font-semibold text-white">{{ form.saleType === 'cash' ? 'Naqd savdo' : 'Mijozga hisobga' }}</strong></div></div>
           </div>
-          <div class="bg-white/[.07] px-5 py-3 text-[10px] leading-4 text-white/65">Tasdiqlangan reys jurnalga yoziladi. Naqd savdo kassaga tushum sifatida avtomatik qo‘shiladi.</div>
+          <div class="bg-white/[.07] px-5 py-3 text-[10px] leading-4 text-white/65">Tasdiqlangan reys jurnalga yoziladi.</div>
         </div>
 
         <div class="card p-4">
@@ -139,7 +138,6 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
         </div>
 
         <button type="submit" class="btn-primary w-full !rounded-2xl !py-3.5 !text-sm" :disabled="saving || !readyToSave || !activeVehicles.length"><CircleCheck :size="18" />{{ saving ? 'Saqlanmoqda…' : 'Reysni tasdiqlash' }}</button>
-        <p class="text-center text-[10px] leading-4 text-muted">Reysni yuborish orqali ma’lumotlar to‘g‘riligini tasdiqlaysiz.</p>
       </aside>
     </form>
     <ModalDialog v-model="showVehicle" title="Yangi texnika qo‘shish" description="Reys kiritish uchun samosval kerak.">

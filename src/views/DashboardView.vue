@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Weight, Truck, CircleDollarSign, TrendingUp, WalletCards, ArrowUpRight, ArrowDownRight,
-  ChevronRight, Activity, Wrench, Clock3, UsersRound, CircleAlert, Banknote,
+  ChevronRight, Activity, Wrench, UsersRound, CircleAlert, Banknote,
 } from 'lucide-vue-next'
 import MetricCard from '../components/MetricCard.vue'
 import { useQuarryStore } from '../stores/quarry'
@@ -118,7 +118,5 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
         </article>
       </div>
     </section>
-
-    <div class="flex items-start gap-2 rounded-xl border border-line bg-white px-4 py-3 text-[10px] leading-4 text-muted"><Clock3 :size="14" class="mt-0.5 shrink-0 text-leaf" />Dashboard qiymatlari reyslar va moliyaviy yozuvlardan avtomatik hisoblanadi. Sof foyda — bugungi reyslar sotuv qiymatidan bugungi xarajatlar ayrilgan ko‘rsatkich.</div>
   </div>
 </template>

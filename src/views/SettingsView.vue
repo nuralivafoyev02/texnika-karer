@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ShieldCheck, Plus, Pencil, Trash2, Package, CircleAlert, UsersRound, LockKeyhole, WalletCards, Settings2 } from 'lucide-vue-next'
+import { ShieldCheck, Plus, Pencil, Trash2, Package, UsersRound, LockKeyhole, WalletCards, Settings2 } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import RoleEditor from '../components/forms/RoleEditor.vue'
 import MaterialsPanel from '../components/settings/MaterialsPanel.vue'
@@ -107,26 +107,10 @@ async function removeRole(role) {
           </div>
         </article>
       </div>
-      <div class="flex items-start gap-3 rounded-2xl border border-[#cfe0d3] bg-[#f2f8f3] p-4">
-        <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><LockKeyhole :size="17" /></div>
-        <div>
-          <p class="text-xs font-bold text-forest">Dinamik RBAC qanday ishlaydi?</p>
-          <p class="mt-1 text-[11px] leading-5 text-[#66816e]">Xodimga rol biriktiriladi. Menyu va tugmalar rol ruxsatlariga qarab filtrlanadi; Supabase RLS esa xuddi shu huquq kalitlarini serverda tekshiradi. UI'da tugmani yashirishning o‘zi xavfsizlik chegarasi hisoblanmaydi.</p>
-          <p class="mt-2 text-[11px] leading-5 text-[#66816e]"><b class="text-forest">To‘liq dostub = superadmin.</b> Lavozimga katalogdagi barcha ruxsatlar berilsa, u lavozimdagi xodimlar superadmin bo‘ladi: xodim qo‘shadi, login/parol beradi, lavozim va ruxsatlarni boshqaradi. Superadminlar soni cheklanmaydi. “Xodim qo‘shish” va “Moliya turi qo‘shish” kabi alohida <i>create</i> ruxsatlari esa oddiy xodimga ham kerakli ma’lumotni mustaqil kiritish imkonini beradi.</p>
-        </div>
-      </div>
     </template>
 
     <MaterialsPanel v-else-if="activeTab === 'materials' && store.canCreateMaterial" />
     <FinanceCategoriesPanel v-else-if="activeTab === 'finance' && store.canCreateCategory" />
-
-    <div class="flex items-start gap-3 rounded-2xl border border-[#cfe0d3] bg-[#f2f8f3] p-4">
-      <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><CircleAlert :size="17" /></div>
-      <div>
-        <p class="text-xs font-bold text-forest">Sozlamalar qayerda saqlanadi?</p>
-        <p class="mt-1 text-[11px] leading-5 text-[#66816e]">Lavozim ruxsatlari, mahsulotlar va moliya turlari Supabase bazasida RLS orqali himoyalangan. O‘chirish bilan bog‘liq cheklovlar ham bazada qo‘yilgan: UI xabarni ko‘rsatadi, qaror esa server qabul qiladi.</p>
-      </div>
-    </div>
 
     <ModalDialog v-model="showEditor" :title="editingRole ? 'Lavozimni tahrirlash' : 'Yangi lavozim yaratish'" description="Kirish huquqlarini alohida bo‘lim va amallar bo‘yicha belgilang." width="max-w-2xl">
       <RoleEditor :key="editingRole?.id || 'new-role'" :role="editingRole" :catalog="PERMISSION_CATALOG" :loading="saving" @submit="saveRole" @cancel="showEditor = false" />

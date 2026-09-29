@@ -53,7 +53,7 @@ function openPayment(clientId = '') { selectedClientId.value = clientId; showPay
 
     <section class="card overflow-hidden">
       <div class="flex flex-col gap-3 border-b border-line p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div><h2 class="section-title">Mijozlar ro‘yxati</h2><p class="mt-1 text-xs text-muted">Balans reyslar va tushgan to‘lovlar asosida hisoblanadi</p></div>
+        <div><h2 class="section-title">Mijozlar ro‘yxati</h2></div>
         <label class="relative w-full sm:max-w-[290px]"><Search :size="15" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input v-model="search" class="field !py-2.5 !pl-9" placeholder="Mijoz yoki telefon..." /></label>
       </div>
       <div class="overflow-x-auto">
