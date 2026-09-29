@@ -43,11 +43,12 @@ export const GUIDE_SECTIONS = [
     short: 'Karerdan chiqqan har bir samosval reysi va yuk tafsilotlari.',
     purpose: 'Barcha reyslarning tarixi: qaysi texnika, qaysi haydovchi, qaysi mijoz, qancha tonna, qaysi tosh va qancha summa. Yer ostidagi ishlab chiqarish hujjati shu yerda.',
     actions: [
-      'Reyslarni matn bo‘yicha qidirish (reys ID, mijoz, samosval, haydovchi, tosh turi)',
+      'Reyslarni matn bo‘yicha qidirish (reys ID, mijoz, samosval, haydovchi, tosh turi, izoh)',
       'Bugungi yoki barcha sana filtri',
       'Naqd / hisobga savdo filtri',
       'Ko‘rsatilgan reyslar uchun jami tonna va sotuv qiymati',
       'Yuk fotosuratini ko‘rish (tarozidan olingan surat)',
+      'Reys izohini ko‘rish — qaysi obyektga tashilgani jadvalda yoziladi',
     ],
     steps: [
       'Qidiruv maydoniga reys ID, mijoz yoki samosval nomini yozing.',
@@ -68,17 +69,18 @@ export const GUIDE_SECTIONS = [
       'Faol samosvalni tanlash (servisdagi texnika tanlanmaydi)',
       'Tosh turi va tonna narxini tanlash — summa o‘zi chiqadi',
       'Og‘irlik (tonna) va ish vaqti (soat) kiritish',
-      'Naqd savdo yoki mijozga hisobga savdo tanlash',
+      'Naqd savdo yoki mijozga hisobga savdo tanlash — naqdda mijoz ixtiyoriy',
+      'Reysga izoh yozish — qaysi obyektga tashilgani',
       'Yuk fotosurati qo‘shish (ixtiyoriy, 1,5 MB gacha)',
     ],
     steps: [
       'Samosvalni tanlang — haydovchi avtomatik to‘ldiriladi.',
       'Tosh turini tanlang: tonna narxi sizning kiritgan qiymatingiz.',
       'Tarozidagi og‘irlikni kiriting (0 dan katta bo‘lishi shart).',
-      'Savdo turini tanlang: «Naqd» bo‘lsa, mijoz kerak emas.',
+      'Savdo turini tanlang: «Hisobga» — mijoz majburiy, «Naqd» — mijoz ixtiyoriy (yuk kimka ekanini yozib qolish uchun).',
       'Rasm qo‘shib, «Reyni tasdiqlash»ni bosing.',
     ],
-    tips: ['Tasdiqlangan reys narxi keyin o‘zgarmaydi — xato bo‘lsa tahrirlash o‘rniga yangi reys kiritish kerak.', 'Servisdagi texnika reys uchun tanlanmaydi — avval holatini «Faol»ga qaytaring.'],
+    tips: ['Tasdiqlangan reys narxi keyin o‘zgarmaydi — xato bo‘lsa tahrirlash o‘rniga yangi reys kiritish kerak.', 'Naqd reysda mijoz tanlansa, u jurnalda ko‘rinadi — balansga qarz yozilmaydi.', 'Servisdagi texnika reys uchun tanlanmaydi — avval holatini «Faol»ga qaytaring.'],
   },
   {
     id: 'clients',
@@ -138,6 +140,7 @@ export const GUIDE_SECTIONS = [
       'Kassa / bank / hammasi filtri va matn qidiruvi',
       'Shu oygi xarajatlarning turlar bo‘yicha taqsimoti',
       'Jadvalni CSV faylga eksport qilish',
+      'Har bir kirim va chiqimga izoh yozish — jurnalda «Tafsilot» sifatida ko‘rinadi',
     ],
     steps: [
       'To‘lov uchun «To‘lov kiritish»: tur, mijoz, summa, usul.',

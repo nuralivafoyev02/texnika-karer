@@ -63,7 +63,7 @@ async function remove(category) {
       >
         <div class="flex items-center justify-between border-b border-line px-5 py-4">
           <div class="flex items-start gap-3">
-            <div class="grid h-9 w-9 place-items-center rounded-xl" :class="group.direction === 'in' ? 'bg-[#eaf5ee] text-leaf' : 'bg-[#fff4e3] text-amber'">
+            <div class="grid h-9 w-9 place-items-center rounded-xl" :class="group.direction === 'in' ? 'bg-[#e6f1ff] text-leaf' : 'bg-[#fff4e3] text-amber'">
               <component :is="group.direction === 'in' ? ArrowDownLeft : ArrowUpRight" :size="17" />
             </div>
             <div>
@@ -76,7 +76,7 @@ async function remove(category) {
 
         <div class="divide-y divide-[#f0f2f0]">
           <div v-for="category in group.items" :key="category.id" class="flex items-center gap-3 px-5 py-3.5">
-            <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl" :class="group.direction === 'in' ? 'bg-[#eaf5ee] text-leaf' : 'bg-[#fff4e3] text-amber'">
+            <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl" :class="group.direction === 'in' ? 'bg-[#e6f1ff] text-leaf' : 'bg-[#fff4e3] text-amber'">
               <component :is="group.direction === 'in' ? ArrowDownLeft : ArrowUpRight" :size="16" />
             </div>
             <div class="min-w-0 flex-1">
@@ -101,19 +101,18 @@ async function remove(category) {
       </section>
     </div>
 
-    <div v-if="!canManage" class="flex items-start gap-3 rounded-2xl border border-[#cfe0d3] bg-[#f2f8f3] p-4">
+    <div v-if="!canManage" class="flex items-start gap-3 rounded-2xl border border-[#d8e4f5] bg-[#f4f8ff] p-4">
       <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><LockKeyhole :size="17" /></div>
       <div>
-        <p class="text-xs font-bold text-forest">Faqat qo‘shish ruxsati</p>
-        <p class="mt-1 text-[11px] leading-5 text-[#66816e]">Siz yangi daromat yoki xarajat turini mustaqil yarata olasiz. Mavjud turlarni tahrirlash va o‘chirish uchun “Moliya turlarini boshqarish” ruxsati kerak — uni superadmin Sozlamalar → Lavozimlar orqali beradi.</p>
+        <p class="text-xs font-bold text-forest">Faqat qo‘shish ruxsati</p>          <p class="mt-1 text-[11px] leading-5 text-[#5b7295]">Yangi turi mustaqil yarata olasiz; tahrirlash va o‘chirish uchun “Moliya turlarini boshqarish” ruxsati kerak.</p>
       </div>
     </div>
 
-    <div class="flex items-start gap-3 rounded-2xl border border-[#cfe0d3] bg-[#f2f8f3] p-4">
+    <div class="flex items-start gap-3 rounded-2xl border border-[#d8e4f5] bg-[#f4f8ff] p-4">
       <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><WalletCards :size="17" /></div>
       <div>
         <p class="text-xs font-bold text-forest">Xavfsizlik qoidasi</p>
-        <p class="mt-1 text-[11px] leading-5 text-[#66816e]">Tizim turlari (Naqd savdo, Mijoz to‘lovi, Yoqilg‘i va h.k.) o‘chirilmaydi. Yaratilgan turi esa biror reys yoki to‘lovda ishlatilgan bo‘lsa, bazada bloklanadi va necha marta ishlatilgani sabab sifatida ko‘rsatiladi. Nomni tahrirlash xavfsiz: yozuvlar eski kalitda qoladi.</p>
+        <p class="mt-1 text-[11px] leading-5 text-[#5b7295]">Tizim turlari (Naqd savdo, Mijoz to‘lovi, Yoqilg‘i va h.k.) o‘chirilmaydi; yaratilgan turi reys yoki to‘lovda ishlatilgan bo‘lsa, bazada bloklanadi.</p>
       </div>
     </div>
 

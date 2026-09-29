@@ -54,7 +54,7 @@ function submit() {
         <span class="mt-1 block text-[10px] text-muted">Faqat <b>Haydovchi</b> huquqiga ega xodimlar ro‘yxatda chiqadi. Yaratish superadmin tomonidan amalga oshiriladi.</span>
       </label>
     </div>
-    <div class="mt-4 flex gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-[11px] leading-4 text-blue-800"><Truck :size="15" class="mt-0.5 shrink-0" /><span>Texnika serviska o‘tkazilsa, uni reyslarga tanlab bo‘lmaydi.</span></div>
+    <div class="mt-4 flex gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-[11px] leading-4 text-blue-800"><Truck :size="15" class="mt-0.5 shrink-0" /><span>Texnika servisga o‘tkazilsa, uni reyslarga tanlab bo‘lmaydi.</span></div>
     <p v-if="error" class="mt-3 text-xs font-semibold text-danger">{{ error }}</p>
     <FormActions :loading="loading" :submit-label="isEdit ? 'Saqlash' : 'Texnika qo‘shish'" @cancel="emit('cancel')" />
   </form>

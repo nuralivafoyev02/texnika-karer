@@ -91,14 +91,14 @@ function openDriverForm() { showCreate.value = false; showDriver.value = true }
 
     <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-mint text-leaf"><Truck :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Jami texnika</p><p class="mt-1 text-lg font-bold text-ink">{{ store.vehicles.length }}</p></div></div>
-      <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#eaf5ee] text-leaf"><CircleCheck :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Ishga tayyor</p><p class="mt-1 text-lg font-bold text-ink">{{ activeCount }}</p></div></div>
+      <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#e6f1ff] text-leaf"><CircleCheck :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Ishga tayyor</p><p class="mt-1 text-lg font-bold text-ink">{{ activeCount }}</p></div></div>
       <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#edf3fa] text-[#4f7595]"><Gauge :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Joriy oy</p><p class="mt-1 text-lg font-bold text-ink">{{ totalTrips }} <span class="text-xs font-medium text-muted">reys · {{ number(totalHours, 1) }} soat</span></p></div></div>
       <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#fff4e3] text-[#b77824]"><Wrench :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Remont xarajati</p><p class="mt-1 text-lg font-bold text-ink">{{ money(repairSpend, { short: true }) }}</p></div></div>
     </section>
 
     <section v-if="canManage && !drivers.length" class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f2dfc2] bg-[#fff9ef] px-4 py-3">
       <div class="flex items-center gap-2 text-[#96621d]"><UserRoundPlus :size="16" /><p class="text-xs font-bold">Hali haydovchi yo‘q</p></div>
-      <button class="btn-secondary !border-[#e8d3ae] !bg-white !text-[#96621d]" @click="openDriverForm"><UserRoundPlus :size="15" /> Birinchi haydovchini qo‘shish</button>
+      <button class="btn-secondary" @click="openDriverForm"><UserRoundPlus :size="15" /> Birinchi haydovchini qo‘shish</button>
     </section>
 
     <section v-if="store.maintenanceReports.length" class="card overflow-hidden">
@@ -123,7 +123,7 @@ function openDriverForm() { showCreate.value = false; showDriver.value = true }
       <div class="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
         <article v-for="vehicle in vehicles" :key="vehicle.id" class="rounded-2xl border border-line bg-white p-4">
           <div class="flex items-start justify-between gap-3">
-            <div class="flex min-w-0 items-center gap-3"><div class="grid h-11 w-11 shrink-0 place-items-center rounded-[14px]" :class="vehicle.status === 'active' ? 'bg-mint text-leaf' : vehicle.status === 'repair' ? 'bg-red-50 text-danger' : 'bg-[#fff4e3] text-amber'"><Truck :size="21" /></div><div class="min-w-0"><p class="truncate text-xs font-bold text-ink">{{ vehicle.plate }}</p><p class="mt-1 truncate text-[10px] text-muted">{{ vehicle.model }}<span v-if="vehicle.year"> · {{ vehicle.year }}</span></p></div></div>
+            <div class="flex min-w-0 items-center gap-3"><div class="grid h-11 w-11 shrink-0 place-items-center rounded-lg" :class="vehicle.status === 'active' ? 'bg-mint text-leaf' : vehicle.status === 'repair' ? 'bg-red-50 text-danger' : 'bg-[#fff4e3] text-amber'"><Truck :size="21" /></div><div class="min-w-0"><p class="truncate text-xs font-bold text-ink">{{ vehicle.plate }}</p><p class="mt-1 truncate text-[10px] text-muted">{{ vehicle.model }}<span v-if="vehicle.year"> · {{ vehicle.year }}</span></p></div></div>
             <span class="status-pill shrink-0" :class="vehicle.status === 'active' ? 'status-active' : vehicle.status === 'repair' ? 'status-repair' : 'status-service'">{{ vehicle.status === 'active' ? 'Faol' : vehicle.status === 'repair' ? 'Remontda' : 'Servisda' }}</span>
           </div>
 
@@ -168,7 +168,7 @@ function openDriverForm() { showCreate.value = false; showDriver.value = true }
     </ModalDialog>
     <ModalDialog :model-value="Boolean(credentials)" title="Xodim tizimga tayyor" description="Login va parolni xodimga yetkazing." @update:model-value="credentials = null">
       <div class="space-y-4">
-        <div class="rounded-2xl border border-mint bg-[#f4faf5] p-4"><p class="text-[10px] font-bold uppercase tracking-wide text-muted">{{ credentials?.name }}</p><dl class="mt-3 space-y-2 text-sm"><div class="flex items-center justify-between gap-3"><dt class="text-muted">Login</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.login }}</code></dd></div><div class="flex items-center justify-between gap-3"><dt class="text-muted">Parol</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.password }}</code></dd></div></dl></div>
+        <div class="rounded-2xl border border-mint bg-[#f4f9ff] p-4"><p class="text-[10px] font-bold uppercase tracking-wide text-muted">{{ credentials?.name }}</p><dl class="mt-3 space-y-2 text-sm"><div class="flex items-center justify-between gap-3"><dt class="text-muted">Login</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.login }}</code></dd></div><div class="flex items-center justify-between gap-3"><dt class="text-muted">Parol</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.password }}</code></dd></div></dl></div>
         <div class="flex justify-end gap-2"><button class="btn-secondary" type="button" @click="credentials = null">Yopish</button><button class="btn-primary" type="button" @click="copyCredentials"><Check v-if="copied" :size="15" /><Copy v-else :size="15" />{{ copied ? 'Nusxalandi' : 'Nusxa olish' }}</button></div>
       </div>
     </ModalDialog>

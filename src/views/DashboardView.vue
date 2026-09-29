@@ -29,7 +29,6 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
         <h1 class="mt-1 text-[27px] font-bold tracking-[-.035em] text-ink">{{ greeting() }}, {{ store.currentUser?.fullName?.split(' ')[0] }} <span>👋</span></h1>
         <p class="mt-1 text-sm text-muted">Kareringizdagi bugungi ish faoliyati va asosiy ko‘rsatkichlar.</p>
       </div>
-      <div class="flex items-center gap-2 rounded-xl border border-line bg-white px-3.5 py-2.5 text-xs text-muted"><span class="status-dot"></span> Jonli monitoring <span class="ml-1 text-slate-300">·</span><span>{{ store.todayTrips.length }} ta reys</span></div>
     </div>
 
     <button v-if="store.openReports.length" class="flex w-full items-center gap-3 rounded-2xl border border-[#f2dfc2] bg-[#fff9ef] px-4 py-3.5 text-left transition hover:border-[#e6c891]" @click="router.push('/fleet')">
@@ -54,15 +53,15 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
         <div class="mt-7 grid h-[185px] grid-cols-7 gap-2 sm:gap-5">
           <div v-for="day in week" :key="day.key" class="flex min-w-0 flex-col items-center justify-end">
             <div class="flex h-[145px] w-full items-end justify-center gap-1.5 border-b border-line pb-0.5">
-              <div class="group relative w-[min(27%,18px)] rounded-t-[5px] bg-[#75ae87] transition-all hover:bg-leaf" :style="{ height: `${barHeight(day.sales)}px` }" :title="`Sotuv: ${money(day.sales)}`"><span class="pointer-events-none absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-ink px-2 py-1 text-[9px] text-white group-hover:block">{{ money(day.sales, { short: true }) }}</span></div>
-              <div class="group relative w-[min(27%,18px)] rounded-t-[5px] bg-[#f0c58f] transition-all hover:bg-amber" :style="{ height: `${barHeight(day.expenses)}px` }" :title="`Xarajat: ${money(day.expenses)}`"><span class="pointer-events-none absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-ink px-2 py-1 text-[9px] text-white group-hover:block">{{ money(day.expenses, { short: true }) }}</span></div>
+              <div class="group relative w-[min(27%,18px)] rounded-t-lg bg-[#1f90ff] transition-all hover:bg-leaf" :style="{ height: `${barHeight(day.sales)}px` }" :title="`Sotuv: ${money(day.sales)}`"><span class="pointer-events-none absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-ink px-2 py-1 text-[9px] text-white group-hover:block">{{ money(day.sales, { short: true }) }}</span></div>
+              <div class="group relative w-[min(27%,18px)] rounded-t-lg bg-[#f0c58f] transition-all hover:bg-amber" :style="{ height: `${barHeight(day.expenses)}px` }" :title="`Xarajat: ${money(day.expenses)}`"><span class="pointer-events-none absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-ink px-2 py-1 text-[9px] text-white group-hover:block">{{ money(day.expenses, { short: true }) }}</span></div>
             </div>
             <span class="mt-2 text-[10px] capitalize text-muted">{{ day.label }}</span>
           </div>
         </div>
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f7faf7] px-4 py-3">
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f7fafd] px-4 py-3">
           <div class="flex items-center gap-2 text-[11px] text-muted"><Activity :size="15" class="text-leaf" /><span>Bugungi savdo qiymati</span></div>
-          <div class="flex items-center gap-2"><span class="text-sm font-bold text-ink">{{ money(store.todaySales, { short: true }) }}</span><span class="rounded-md bg-[#e9f4ec] px-1.5 py-1 text-[9px] font-bold text-leaf">{{ number(store.todayTonnage, 1) }} t</span></div>
+          <div class="flex items-center gap-2"><span class="text-sm font-bold text-ink">{{ money(store.todaySales, { short: true }) }}</span><span class="rounded-md bg-[#e9f2ff] px-1.5 py-1 text-[9px] font-bold text-leaf">{{ number(store.todayTonnage, 1) }} t</span></div>
         </div>
       </article>
 
@@ -72,7 +71,7 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
           <div class="flex items-center justify-between rounded-xl border border-line px-3.5 py-3"><div class="flex items-center gap-3"><div class="grid h-8 w-8 place-items-center rounded-lg bg-[#fff4e3] text-[#b77824]"><Banknote :size="16" /></div><div><p class="text-xs font-semibold text-ink">Naqd kassa</p><p class="mt-0.5 text-[10px] text-muted">Joriy qoldiq</p></div></div><strong class="text-sm font-bold text-ink">{{ money(store.cashBalance, { short: true }) }}</strong></div>
           <div class="flex items-center justify-between rounded-xl border border-line px-3.5 py-3"><div class="flex items-center gap-3"><div class="grid h-8 w-8 place-items-center rounded-lg bg-[#eaf2fa] text-[#4f7595]"><WalletCards :size="16" /></div><div><p class="text-xs font-semibold text-ink">Bank hisob raqami</p><p class="mt-0.5 text-[10px] text-muted">Joriy qoldiq</p></div></div><strong class="text-sm font-bold text-ink">{{ money(store.bankBalance, { short: true }) }}</strong></div>
         </div>
-        <div class="mt-4 flex items-center justify-between rounded-xl bg-[#f7faf7] px-3.5 py-3"><span class="text-xs font-semibold text-muted">Ochiq nosozliklar</span><span class="text-sm font-bold" :class="store.openReports.length ? 'text-amber' : 'text-leaf'">{{ store.openReports.length }} ta</span></div>
+        <div class="mt-4 flex items-center justify-between rounded-xl bg-[#f7fafd] px-3.5 py-3"><span class="text-xs font-semibold text-muted">Ochiq nosozliklar</span><span class="text-sm font-bold" :class="store.openReports.length ? 'text-amber' : 'text-leaf'">{{ store.openReports.length }} ta</span></div>
         <button v-if="store.can('finance.view')" class="mt-3 flex w-full items-center justify-between px-1 py-2 text-xs font-bold text-leaf hover:text-forest" @click="router.push('/finance')">Moliyaviy hisobotga o‘tish <ArrowUpRight :size="15" /></button>
       </article>
     </section>

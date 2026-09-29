@@ -73,9 +73,9 @@ export function createDemoData() {
   ]
 
   const tripSeed = [
-    { id: 'T-2401', vehicleId: 'v-1', driverId: 'u-driver-1', clientId: 'c-1', materialId: 'm-1', weightTons: 28.4, hoursWorked: 1.2, saleType: 'credit', daysAgo: 0, hour: 8, minute: 5 },
-    { id: 'T-2402', vehicleId: 'v-2', driverId: 'u-driver-2', clientId: null, materialId: 'm-2', weightTons: 32.1, hoursWorked: 1.4, saleType: 'cash', daysAgo: 0, hour: 8, minute: 48 },
-    { id: 'T-2403', vehicleId: 'v-3', driverId: 'u-driver-3', clientId: 'c-3', materialId: 'm-3', weightTons: 25.8, hoursWorked: 1.1, saleType: 'credit', daysAgo: 0, hour: 9, minute: 32 },
+    { id: 'T-2401', vehicleId: 'v-1', driverId: 'u-driver-1', clientId: 'c-1', materialId: 'm-1', weightTons: 28.4, hoursWorked: 1.2, saleType: 'credit', note: 'Chorsu qurilish maydonchasiga', daysAgo: 0, hour: 8, minute: 5 },
+    { id: 'T-2402', vehicleId: 'v-2', driverId: 'u-driver-2', clientId: 'c-1', materialId: 'm-2', weightTons: 32.1, hoursWorked: 1.4, saleType: 'cash', note: 'Naqd, «Tosh omboni» — mijoz ko‘rsatildi', daysAgo: 0, hour: 8, minute: 48 },
+    { id: 'T-2403', vehicleId: 'v-3', driverId: 'u-driver-3', clientId: 'c-3', materialId: 'm-3', weightTons: 25.8, hoursWorked: 1.1, saleType: 'credit', note: 'Shartnoma №45 bo‘yicha', daysAgo: 0, hour: 9, minute: 32 },
     { id: 'T-2404', vehicleId: 'v-1', driverId: 'u-driver-1', clientId: 'c-2', materialId: 'm-1', weightTons: 29.7, hoursWorked: 1.3, saleType: 'credit', daysAgo: 0, hour: 10, minute: 16 },
     { id: 'T-2405', vehicleId: 'v-5', driverId: 'u-driver-1', clientId: null, materialId: 'm-3', weightTons: 31.0, hoursWorked: 1.5, saleType: 'cash', daysAgo: 0, hour: 10, minute: 54 },
     { id: 'T-2406', vehicleId: 'v-2', driverId: 'u-driver-2', clientId: 'c-4', materialId: 'm-2', weightTons: 27.2, hoursWorked: 1.2, saleType: 'credit', daysAgo: 0, hour: 11, minute: 21 },
@@ -106,6 +106,7 @@ export function createDemoData() {
       hoursWorked: item.hoursWorked,
       photoUrl: '',
       photoName: '',
+      note: item.note || '',
       createdAt: shiftDate(item.daysAgo, item.hour, item.minute),
       createdBy: 'u-scale',
     }
@@ -127,7 +128,7 @@ export function createDemoData() {
   trips.filter((trip) => trip.saleType === 'cash').forEach((trip) => {
     transactions.push({
       id: `TX-${trip.id}`, direction: 'in', category: 'cash_sale', amount: trip.totalAmount,
-      paymentMethod: 'cash', clientId: null, driverId: null, vehicleId: trip.vehicleId,
+      paymentMethod: 'cash', clientId: trip.clientId, driverId: null, vehicleId: trip.vehicleId,
       note: `Naqd savdo · ${trip.id}`, tripId: trip.id, createdAt: trip.createdAt,
     })
   })

@@ -46,8 +46,8 @@ const onAmount = (event) => captureAmountInput(event, (value) => { form.amount =
       <label v-if="selectedCategory?.needsDriver" class="sm:col-span-2"><span class="label">Haydovchi</span><select v-model="form.driverId" class="field"><option value="">Haydovchini tanlang</option><option v-for="driver in drivers" :key="driver.id" :value="driver.id">{{ driver.fullName }}</option></select></label>
     </div>
     <fieldset class="mt-4"><legend class="label">To‘lov manbasi</legend><div class="grid grid-cols-2 gap-2">
-      <button type="button" :class="form.paymentMethod === 'cash' ? 'border-leaf bg-mint text-forest ring-2 ring-emerald-50' : 'border-line bg-white text-muted'" class="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold" @click="form.paymentMethod = 'cash'"><span class="h-2 w-2 rounded-full bg-amber"></span> Naqd kassa</button>
-      <button type="button" :class="form.paymentMethod === 'bank' ? 'border-leaf bg-mint text-forest ring-2 ring-emerald-50' : 'border-line bg-white text-muted'" class="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold" @click="form.paymentMethod = 'bank'"><WalletCards :size="16" /> Bank</button>
+      <button type="button" :class="form.paymentMethod === 'cash' ? 'border-leaf bg-mint text-forest ring-2 ring-blue-100' : 'border-line bg-white text-muted'" class="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold" @click="form.paymentMethod = 'cash'"><span class="h-2 w-2 rounded-full bg-leaf"></span> Naqd kassa</button>
+      <button type="button" :class="form.paymentMethod === 'bank' ? 'border-leaf bg-mint text-forest ring-2 ring-blue-100' : 'border-line bg-white text-muted'" class="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold" @click="form.paymentMethod = 'bank'"><WalletCards :size="16" /> Bank</button>
     </div></fieldset>
     <label class="mt-4 block"><span class="label">Izoh</span><input v-model="form.note" class="field" placeholder="Xarajat tafsiloti" /></label>
     <p v-if="error" class="mt-3 text-xs font-semibold text-danger">{{ error }}</p>

@@ -85,12 +85,10 @@ async function removeRole(role) {
 
     <template v-if="activeTab === 'roles' && store.can('roles.manage')">
       <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <article v-for="role in roles" :key="role.id" class="card p-5 transition hover:-translate-y-0.5 hover:shadow-soft">
+        <article v-for="role in roles" :key="role.id" class="card p-5 transition hover:shadow-soft">
           <div class="flex items-start justify-between gap-3">
-            <div class="grid h-11 w-11 place-items-center rounded-[14px]" :class="role.name === 'Boshliq' ? 'bg-[#e8f3eb] text-leaf' : role.name === 'Buxgalter' ? 'bg-[#eaf2fa] text-[#4f7595]' : role.name.toLowerCase().includes('haydovchi') ? 'bg-[#eff2f7] text-[#56667e]' : 'bg-[#fff4e3] text-[#b77824]'"><ShieldCheck :size="20" /></div>
+            <div class="grid h-11 w-11 place-items-center rounded-lg" :class="role.name === 'Boshliq' ? 'bg-[#e6f1ff] text-leaf' : role.name === 'Buxgalter' ? 'bg-[#eaf2fa] text-[#4f7595]' : role.name.toLowerCase().includes('haydovchi') ? 'bg-[#eff2f7] text-[#56667e]' : 'bg-[#fff4e3] text-[#b77824]'"><ShieldCheck :size="20" /></div>
             <div class="flex items-center gap-1">
-              <span v-if="role.isSystem" class="tag tag-blue">Tizim roli</span>
-              <span v-if="role.fullAccess" class="tag" title="Bu lavozimdagi har bir xodim superadmin huquqiga ega bo‘ladi"><LockKeyhole :size="10" class="mr-1" />To‘liq dostup</span>
               <button class="btn-quiet !p-2" aria-label="Lavozimni tahrirlash" @click="openRole(role)"><Pencil :size="14" /></button>
               <button v-if="!role.isSystem" class="btn-quiet !p-2 !text-danger" aria-label="Lavozimni o‘chirish" @click="removeRole(role)"><Trash2 :size="14" /></button>
             </div>
@@ -102,8 +100,8 @@ async function removeRole(role) {
             <div class="flex items-center gap-1.5 rounded-lg bg-canvas px-2 py-1 text-[10px] font-bold text-ink"><LockKeyhole :size="12" class="text-leaf" />{{ role.permissions.length }} ruxsat</div>
           </div>
           <div class="mt-3 flex flex-wrap gap-1.5">
-            <span v-for="permission in role.permissions.slice(0, 4)" :key="permission" class="rounded-md bg-[#f4f7f4] px-2 py-1 text-[9px] font-semibold text-[#607067]">{{ PERMISSION_CATALOG.find((item) => item.key === permission)?.label || permission }}</span>
-            <span v-if="role.permissions.length > 4" class="rounded-md bg-[#f4f7f4] px-2 py-1 text-[9px] font-semibold text-muted">+{{ role.permissions.length - 4 }} ta</span>
+            <span v-for="permission in role.permissions.slice(0, 4)" :key="permission" class="rounded-md bg-[#f4f7fc] px-2 py-1 text-[9px] font-semibold text-[#607067]">{{ PERMISSION_CATALOG.find((item) => item.key === permission)?.label || permission }}</span>
+            <span v-if="role.permissions.length > 4" class="rounded-md bg-[#f4f7fc] px-2 py-1 text-[9px] font-semibold text-muted">+{{ role.permissions.length - 4 }} ta</span>
           </div>
         </article>
       </div>

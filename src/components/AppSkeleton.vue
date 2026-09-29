@@ -54,19 +54,19 @@ const formFields = 8
     <aside class="sidebar" aria-hidden="true">
       <div class="brand-lockup">
         <div class="brand-mark"><span></span><span></span><span></span></div>
-        <div class="brand-copy"><strong>AliBuilding<span style="color:#9fd1ac">.uz</span></strong><small>TEXNIKA BOSHQARUVI</small></div>
+        <div class="brand-copy"><strong>AliBuilding<span style="color:#7db3ff">.uz</span></strong><small>TEXNIKA BOSHQARUVI</small></div>
       </div>
       <div class="sidebar-scroll">
         <section v-for="(group, index) in navGroups" :key="index">
           <div class="skeleton mx-3 mt-[17px] mb-2 h-2 w-16 rounded" style="background: rgba(255,255,255,.16)" />
-          <div v-for="item in group.items" :key="item" class="flex items-center gap-3 rounded-[11px] px-3 py-2.5">
+          <div v-for="item in group.items" :key="item" class="flex items-center gap-3 rounded-lg px-3 py-2.5">
             <div class="skeleton h-[17px] w-[17px] rounded-md" style="background: rgba(255,255,255,.14)" />
             <div class="skeleton h-2.5 flex-1 rounded" style="background: rgba(255,255,255,.12)" />
           </div>
         </section>
       </div>
       <div class="sidebar-bottom">
-        <div class="text-center text-[10px] font-semibold text-[#7f9f8a]">v1.3.2</div>
+        <div class="text-center text-[10px] font-semibold text-[#7f9cc4]">v1.3.2</div>
       </div>
     </aside>
 
@@ -125,8 +125,8 @@ const formFields = 8
             <div class="skeleton mt-2.5 h-2.5 w-32 rounded" />
             <div class="mt-7 flex h-[185px] items-end gap-2 border-b border-line sm:gap-5">
               <div v-for="bar in chartBars" :key="bar" class="flex h-full flex-1 items-end justify-center gap-1.5">
-                <div class="skeleton w-[min(27%,18px)] rounded-t-[5px]" :style="{ height: `${38 + ((bar * 23) % 58)}%` }" />
-                <div class="skeleton skeleton-soft w-[min(27%,18px)] rounded-t-[5px]" :style="{ height: `${22 + ((bar * 17) % 46)}%` }" />
+                <div class="skeleton w-[min(27%,18px)] rounded-t-lg" :style="{ height: `${38 + ((bar * 23) % 58)}%` }" />
+                <div class="skeleton skeleton-soft w-[min(27%,18px)] rounded-t-lg" :style="{ height: `${22 + ((bar * 17) % 46)}%` }" />
               </div>
             </div>
             <div class="skeleton mt-4 h-[46px] w-full rounded-xl" />

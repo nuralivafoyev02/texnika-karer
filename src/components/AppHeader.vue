@@ -52,7 +52,7 @@ const suggestions = computed(() => {
     .forEach((section) => items.push({ id: `section-${section.id}`, icon: LayoutGrid, label: section.title, hint: section.short, kind: 'Bo‘lim', to: { path: section.route } }))
   if (store.can('trips.view')) {
     store.trips
-      .filter((trip) => [trip.id, store.tripClient(trip), store.vehicleName(trip.vehicleId), store.driverName(trip.driverId), store.materialName(trip.materialId)].join(' ').toLowerCase().includes(term))
+      .filter((trip) => [trip.id, store.tripClient(trip), store.vehicleName(trip.vehicleId), store.driverName(trip.driverId), store.materialName(trip.materialId), trip.note].join(' ').toLowerCase().includes(term))
       .slice(0, 3)
       .forEach((trip) => items.push({
         id: `trip-${trip.id}`,
@@ -285,7 +285,7 @@ async function logout() {
         <Transition name="dropdown">
           <div v-if="showUsers" class="header-menu !w-[286px]">
             <div class="header-menu-panel">
-            <div class="header-menu-title"><span>{{ store.remoteMode ? 'Hisob' : 'Demo foydalanuvchi' }}</span><span v-if="!store.remoteMode" class="tag tag-blue">Rolni sinash</span></div>
+            <div class="header-menu-title"><span>{{ store.remoteMode ? 'Hisob' : 'Demo foydalanuvchi' }}</span></div>
             <!-- Profil qatori: bosilganda tahrirlash modali ochiladi. Ochilgan menyudagi
                  "profil ustiga bosish" talabi shu qatorni bosish bilan bajariladi. -->
             <button class="header-menu-item items-start" @click="openProfileEditor">
@@ -296,7 +296,6 @@ async function logout() {
               <div class="min-w-0 flex-1 text-left">
                 <p class="truncate text-xs font-bold">{{ store.currentUser?.fullName }}</p>
                 <p class="text-[10px] text-muted">{{ store.currentUser?.login }} · {{ store.currentRole?.name }}</p>
-                <span v-if="store.isSuperadmin()" class="mt-1 inline-block rounded bg-[#fff4e3] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#b77824]">super</span>
               </div>
               <Settings :size="14" class="mt-0.5 shrink-0 text-slate-400" />
             </button>

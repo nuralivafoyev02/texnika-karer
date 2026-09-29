@@ -103,7 +103,7 @@ function sectionPermissions(section) {
                         </ol>
                       </div>
                     </div>
-                    <div class="rounded-xl bg-[#f3f8f4] px-3.5 py-3">
+                    <div class="rounded-xl bg-[#f2f7ff] px-3.5 py-3">
                       <p class="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-leaf"><Lightbulb :size="12" /> Maslahatlar</p>
                       <ul class="mt-1.5 space-y-1.5">
                         <li v-for="tip in section.tips" :key="tip" class="flex gap-2 text-[11px] leading-[17px] text-muted">

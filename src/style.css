@@ -39,8 +39,8 @@ button:disabled {
 }
 
 ::selection {
-  background: #d4e9dc;
-  color: #174a32;
+  background: #d6e7ff;
+  color: #0a4fa8;
 }
 
 @layer components {
@@ -49,11 +49,11 @@ button:disabled {
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-leaf focus:outline-none focus:ring-4 focus:ring-emerald-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-leaf px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-forest focus:outline-none focus:ring-4 focus:ring-blue-100;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-canvas focus:outline-none focus:ring-4 focus:ring-emerald-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink transition hover:bg-canvas focus:outline-none focus:ring-4 focus:ring-blue-100;
   }
 
   .btn-quiet {
@@ -65,7 +65,7 @@ button:disabled {
   }
 
   .field {
-    @apply w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-leaf focus:ring-4 focus:ring-emerald-50;
+    @apply w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-leaf focus:ring-4 focus:ring-blue-100;
   }
 
   .label {
@@ -85,7 +85,7 @@ button:disabled {
   }
 
   .table-head {
-    @apply bg-[#F8FAF8] text-left text-[11px] font-bold uppercase tracking-[.08em] text-muted;
+    @apply bg-[#f8fafd] text-left text-[11px] font-bold uppercase tracking-[.08em] text-muted;
   }
 }
 
@@ -108,7 +108,7 @@ button:disabled {
   justify-content: space-between;
   gap: 20px;
   background: rgba(255, 255, 255, .88);
-  border-bottom: 1px solid #e8ede9;
+  border-bottom: 1px solid #e8edf4;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -132,8 +132,8 @@ button:disabled {
   display: flex;
   flex-direction: column;
   padding: 22px 14px 18px;
-  color: #d9e8de;
-  background: #153c2b;
+  color: #dbe6f7;
+  background: #0b2f5e;
 }
 
 .brand-lockup {
@@ -150,8 +150,8 @@ button:disabled {
   align-items: center;
   justify-content: center;
   position: relative;
-  border-radius: 11px;
-  background: #e6f2e9;
+  border-radius: 8px;
+  background: #e6f1ff;
 }
 
 .brand-mark span {
@@ -159,7 +159,7 @@ button:disabled {
   display: block;
   width: 9px;
   height: 17px;
-  border: 2px solid #1b6b45;
+  border: 2px solid #1565d8;
   border-radius: 3px;
   transform: skewY(-28deg);
 }
@@ -195,7 +195,7 @@ button:disabled {
 .brand-copy small {
   display: block;
   margin-top: 4px;
-  color: #a5c4b0;
+  color: #a9c2e8;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: .17em;
@@ -205,12 +205,12 @@ button:disabled {
   flex: 1;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: #476e58 transparent;
+  scrollbar-color: #3f6390 transparent;
 }
 
 .nav-label {
   padding: 17px 12px 7px;
-  color: #87a994;
+  color: #8fa9d4;
   font-size: 9px;
   font-weight: 800;
   letter-spacing: .15em;
@@ -224,8 +224,8 @@ button:disabled {
   border: 0;
   margin: 2px 0;
   padding: 10px 12px;
-  border-radius: 11px;
-  color: #c2d6c8;
+  border-radius: 8px;
+  color: #c9d7ee;
   text-decoration: none;
   font-size: 13px;
   font-weight: 550;
@@ -238,9 +238,9 @@ button:disabled {
 }
 
 .nav-link.router-link-active {
-  background: #286345;
+  background: #1565d8;
   color: #fff;
-  box-shadow: inset 3px 0 0 #a4d3af;
+  box-shadow: inset 3px 0 0 #9cc4ff;
 }
 
 .nav-link .nav-icon {
@@ -262,15 +262,15 @@ button:disabled {
   height: 7px;
   border-radius: 999px;
   display: inline-block;
-  background: #73d39c;
-  box-shadow: 0 0 0 4px rgba(115, 211, 156, .12);
+  background: #3d9bff;
+  box-shadow: 0 0 0 4px rgba(61, 155, 255, .14);
 }
 
 .sidebar-status {
   display: none;
   align-items: center;
   gap: 9px;
-  color: #b7cdbd;
+  color: #b9c9e2;
   font-size: 11px;
 }
 
@@ -305,22 +305,22 @@ button:disabled {
   align-items: center;
   gap: 8px;
   color: #98a39c;
-  border: 1px solid #e9eeea;
+  border: 1px solid #e9eef5;
   background: #fafcfb;
   padding: 8px 11px;
-  border-radius: 11px;
+  border-radius: 8px;
   transition: width .34s cubic-bezier(.16, 1, .3, 1), border-color .2s ease, box-shadow .2s ease;
 }
 
 .header-search.is-open {
   width: 400px;
-  border-color: #d9e6dc;
+  border-color: #d9e6f7;
   background: #fff;
 }
 
 .header-search:focus-within {
-  border-color: #a8cdb4;
-  box-shadow: 0 0 0 3px rgba(42, 118, 80, .1);
+  border-color: #93bcff;
+  box-shadow: 0 0 0 3px rgba(31, 144, 255, .13);
 }
 
 .header-search input {
@@ -343,8 +343,8 @@ button:disabled {
    foydalanuvchi Esc bosishni shu yerdan o'rganadi. */
 .search-kbd {
   flex: 0 0 auto;
-  border: 1px solid #e9eeea;
-  border-radius: 6px;
+  border: 1px solid #e9eef5;
+  border-radius: 8px;
   background: #fff;
   padding: 2px 5px;
   color: #98a39c;
@@ -356,7 +356,7 @@ button:disabled {
 
 .header-search.is-open .search-kbd {
   color: #7b877f;
-  border-color: #d9e6dc;
+  border-color: #d9e6f7;
 }
 
 /* ── Tavsiyalar paneli (global qidiruv natijalari) ──────────────────────────
@@ -383,9 +383,9 @@ button:disabled {
   overflow-y: auto;
   padding: 6px;
   background: #fff;
-  border: 1px solid #e7ece8;
-  border-radius: 14px;
-  box-shadow: 0 18px 55px rgba(25, 46, 33, .17);
+  border: 1px solid #e7ecf3;
+  border-radius: 8px;
+  box-shadow: 0 18px 55px rgba(14, 45, 90, .17);
 }
 
 .search-item {
@@ -395,14 +395,14 @@ button:disabled {
   gap: 10px;
   padding: 8px 9px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fff;
   text-align: left;
 }
 
 .search-item:hover,
 .search-item.is-active {
-  background: #f2f7f3;
+  background: #f2f7fd;
 }
 
 .search-item-icon {
@@ -411,9 +411,9 @@ button:disabled {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: 9px;
-  background: #edf4ef;
-  color: #2a7650;
+  border-radius: 8px;
+  background: #edf4ff;
+  color: #1f90ff;
 }
 
 .search-item-text {
@@ -451,7 +451,7 @@ button:disabled {
 }
 
 .search-item.is-active .search-item-kind {
-  color: #2a7650;
+  color: #1f90ff;
 }
 
 .search-empty {
@@ -463,8 +463,8 @@ button:disabled {
 }
 
 .search-empty kbd {
-  border: 1px solid #e7ece8;
-  border-radius: 5px;
+  border: 1px solid #e7ecf3;
+  border-radius: 8px;
   background: #f5f7f5;
   padding: 1px 4px;
   color: #52615a;
@@ -487,8 +487,8 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e8ede9;
-  border-radius: 12px;
+  border: 1px solid #e8edf4;
+  border-radius: 8px;
   background: white;
   color: #65736a;
   transition: .18s;
@@ -496,8 +496,8 @@ button:disabled {
 }
 
 .header-icon-btn:hover {
-  color: #174a32;
-  background: #f4f8f5;
+  color: #0a4fa8;
+  background: #f4f8fd;
 }
 
 /* ── Dropdown menyu ─────────────────────────────────────────────────────────
@@ -534,7 +534,7 @@ button:disabled {
   grid-template-rows: minmax(0, 1fr);
   opacity: 1;
   overflow: hidden;
-  box-shadow: 0 18px 55px rgba(25, 46, 33, .17);
+  box-shadow: 0 18px 55px rgba(14, 45, 90, .17);
   z-index: 50;
 }
 
@@ -545,8 +545,8 @@ button:disabled {
   min-height: 0;
   padding: 12px;
   background: #fff;
-  border: 1px solid #e7ece8;
-  border-radius: 16px;
+  border: 1px solid #e7ecf3;
+  border-radius: 8px;
 }
 
 .header-menu-title {
@@ -554,7 +554,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   padding: 5px 5px 11px;
-  border-bottom: 1px solid #edf0ed;
+  border-bottom: 1px solid #edf0f6;
   font-size: 13px;
   font-weight: 750;
 }
@@ -566,14 +566,14 @@ button:disabled {
   gap: 10px;
   text-align: left;
   border: 0;
-  border-radius: 11px;
+  border-radius: 8px;
   padding: 10px 8px;
   background: white;
   color: #26352b;
 }
 
 .header-menu-item:hover {
-  background: #f6f8f6;
+  background: #f6f8fc;
 }
 
 .avatar {
@@ -582,9 +582,9 @@ button:disabled {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  border-radius: 12px;
-  background: #e6f1e9;
-  color: #245c3c;
+  border-radius: 8px;
+  background: #e6f1ff;
+  color: #0a4fa8;
   font-size: 11px;
   font-weight: 800;
 }
@@ -592,7 +592,7 @@ button:disabled {
 .avatar-small {
   width: 31px;
   height: 31px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 10px;
 }
 
@@ -631,8 +631,8 @@ button:disabled {
 }
 
 .status-active {
-  background: #eaf5ee;
-  color: #32754d;
+  background: #e6f1ff;
+  color: #1565d8;
 }
 
 .status-service {
@@ -651,8 +651,8 @@ button:disabled {
 }
 
 .status-resolved {
-  background: #edf5ef;
-  color: #558062;
+  background: #e6f1ff;
+  color: #1565d8;
 }
 
 .tag {
@@ -671,8 +671,8 @@ button:disabled {
 }
 
 .tag-cash {
-  color: #34764e;
-  background: #eaf5ee;
+  color: #1565d8;
+  background: #e6f1ff;
 }
 
 .tag-blue {
@@ -689,7 +689,7 @@ button:disabled {
   position: relative;
   overflow: hidden;
   border-radius: 8px;
-  background: #e9eeea;
+  background: #e9eef5;
 }
 
 .skeleton::after {
@@ -703,7 +703,7 @@ button:disabled {
 
 /* Yumshoq fon (kartochka usti) — skelet ichidagi qatorlar yumshoqroq bo'lsin. */
 .skeleton-soft {
-  background: #f0f4f1;
+  background: #f0f4f9;
 }
 
 .skeleton-round {
@@ -731,14 +731,14 @@ button:disabled {
   z-index: 60;
   overflow: hidden;
   pointer-events: none;
-  background: rgba(23, 74, 50, .1);
+  background: rgba(10, 79, 168, .1);
 }
 
 .refresh-bar span {
   display: block;
   width: 40%;
   height: 100%;
-  background: #2a7650;
+  background: #1f90ff;
   animation: loading 1.15s ease-in-out infinite;
 }
 
@@ -772,8 +772,8 @@ button:disabled {
 .loading-track {
   width: 140px;
   height: 4px;
-  border-radius: 10px;
-  background: #e5eee7;
+  border-radius: 8px;
+  background: #e3edfa;
   overflow: hidden;
 }
 
@@ -781,8 +781,8 @@ button:disabled {
   display: block;
   height: 100%;
   width: 40%;
-  border-radius: 10px;
-  background: #2a7650;
+  border-radius: 8px;
+  background: #1f90ff;
   animation: loading 1.15s ease-in-out infinite;
 }
 
@@ -1021,4 +1021,19 @@ button:disabled {
     right: -78px;
     width: min(320px, calc(100vw - 24px));
   }
+}
+
+/* ── Selectlar: yangi palitraga mos ko'k chevron ─────────────────────────────
+   Standart uchburchak o'rnida barcha select'larda bir xil ko'k ko'rsatkich
+   chiziladi. O'z chevroni bilan `appearance-none` qilingan selectlar (masalan,
+   tarozixonadagi samosval tanlovi) bundan mustasno — ularda ikki marta
+   ko'rsatkich chiqmasligi kerak. Qoida qatlamdan tashqarida turadi, shuning
+   uchun `.field` va utility klasslaridan yuqori ustunlikka ega. */
+select.field:not(.appearance-none) {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231f90ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
 }

@@ -19,8 +19,8 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); document.body.
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="modelValue" class="fixed inset-0 z-[80] flex items-center justify-center bg-[#14251c]/45 p-4 backdrop-blur-[3px]" @click.self="close">
-        <section :class="width" data-modal-panel class="max-h-[calc(100vh-32px)] w-full overflow-y-auto rounded-[22px] border border-white/50 bg-white shadow-float">
+      <div v-if="modelValue" class="fixed inset-0 z-[80] flex items-center justify-center bg-[#0e2244]/45 p-4 backdrop-blur-[3px]" @click.self="close">
+        <section :class="width" data-modal-panel class="max-h-[calc(100vh-32px)] w-full overflow-y-auto rounded-lg border border-white/50 bg-white shadow-float">
           <header class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-white/95 px-6 py-5 backdrop-blur">
             <div><h2 class="text-lg font-bold tracking-tight text-ink">{{ title }}</h2><p v-if="description" class="mt-1 text-xs text-muted">{{ description }}</p></div>
             <button class="btn-quiet !p-2" aria-label="Yopish" @click="close"><X :size="18" /></button>

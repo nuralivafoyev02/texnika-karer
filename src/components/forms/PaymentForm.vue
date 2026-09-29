@@ -35,7 +35,7 @@ const onAmount = (event) => captureAmountInput(event, (value) => { form.amount =
 
 <template>
   <form @submit.prevent="submit">
-    <div class="rounded-2xl bg-[#f4f8f5] p-4">
+    <div class="rounded-2xl bg-[#f4f8fd] p-4">
       <div class="mb-3 flex items-center gap-2 text-sm font-bold text-forest"><CircleDollarSign :size="17" /> {{ selectedCategory?.label || 'Mijoz to‘lovi' }}</div>
       <p class="text-xs leading-5 text-muted">{{ selectedCategory?.hint || 'To‘lov kassa yoki bank qoldig‘iga qo‘shiladi va mijoz balansidagi qarzni kamaytiradi.' }}</p>
     </div>
@@ -47,10 +47,10 @@ const onAmount = (event) => captureAmountInput(event, (value) => { form.amount =
       <div v-if="needsClient && chosenClient" class="flex items-center justify-between rounded-xl border border-line px-3.5 py-3 text-xs"><span class="text-muted">Joriy balans</span><strong class="text-ink">{{ money(chosenBalance) }}</strong></div>
       <label><span class="label">To‘lov summasi</span><div class="relative"><input :value="form.amount" class="field pr-14" type="text" inputmode="numeric" autocomplete="off" placeholder="0" @input="onAmount"><span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">so‘m</span></div></label>
       <fieldset><legend class="label">To‘lov turi</legend><div class="grid grid-cols-2 gap-2">
-        <button type="button" :class="form.paymentMethod === 'cash' ? 'border-leaf bg-mint text-forest ring-2 ring-emerald-50' : 'border-line bg-white text-muted'" class="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold" @click="form.paymentMethod = 'cash'"><CircleDollarSign :size="17" /> Naqd kassa</button>
-        <button type="button" :class="form.paymentMethod === 'bank' ? 'border-leaf bg-mint text-forest ring-2 ring-emerald-50' : 'border-line bg-white text-muted'" class="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold" @click="form.paymentMethod = 'bank'"><WalletCards :size="17" /> Bank</button>
+        <button type="button" :class="form.paymentMethod === 'cash' ? 'border-leaf bg-mint text-forest ring-2 ring-blue-100' : 'border-line bg-white text-muted'" class="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold" @click="form.paymentMethod = 'cash'"><CircleDollarSign :size="17" /> Naqd kassa</button>
+        <button type="button" :class="form.paymentMethod === 'bank' ? 'border-leaf bg-mint text-forest ring-2 ring-blue-100' : 'border-line bg-white text-muted'" class="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold" @click="form.paymentMethod = 'bank'"><WalletCards :size="17" /> Bank</button>
       </div></fieldset>
-      <label><span class="label">Izoh <span class="normal-case tracking-normal text-slate-400">(ixtiyoriy)</span></span><input v-model="form.note" class="field" placeholder="Masalan, shartnoma bo‘yicha" /></label>
+      <label><span class="label">Izoh</span><input v-model="form.note" class="field" placeholder="Masalan, shartnoma bo‘yicha" /></label>
       <p v-if="error" class="text-xs font-semibold text-danger">{{ error }}</p>
     </div>
     <FormActions :loading="loading" submit-label="To‘lovni saqlash" @cancel="emit('cancel')" />

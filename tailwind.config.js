@@ -5,18 +5,31 @@ export default {
     extend: {
       colors: {
         ink: '#17231D',
-        forest: '#174A32',
-        leaf: '#2A7650',
-        mint: '#E8F2EC',
-        canvas: '#F5F7F5',
-        muted: '#76827A',
-        line: '#E7ECE8',
+        forest: '#0A4FA8',
+        leaf: '#1F90FF',
+        mint: '#E6F1FF',
+        canvas: '#F5F7FB',
+        muted: '#6E7B8F',
+        line: '#E7ECF3',
         amber: '#D28A30',
         danger: '#C94F4F',
       },
+      // Barcha qutilar (karta, tugma, kiritish maydoni, modal) bir xil 8px.
+      // Halqalar (avatar, nuqta, pill) uchun rounded-full o'z joyida qoladi.
+      borderRadius: {
+        none: '0px',
+        sm: '8px',
+        DEFAULT: '8px',
+        md: '8px',
+        lg: '8px',
+        xl: '8px',
+        '2xl': '8px',
+        '3xl': '8px',
+        full: '9999px',
+      },
       boxShadow: {
-        soft: '0 12px 34px rgba(31, 55, 41, 0.06)',
-        float: '0 20px 60px rgba(23, 35, 29, 0.18)',
+        soft: '0 12px 34px rgba(16, 42, 84, 0.07)',
+        float: '0 20px 60px rgba(15, 35, 70, 0.18)',
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],

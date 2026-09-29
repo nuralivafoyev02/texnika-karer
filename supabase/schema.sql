@@ -193,11 +193,21 @@ create table if not exists public.trips (
   sale_type text not null check (sale_type in ('cash','credit')),
   hours_worked numeric(8,2) not null default 0 check (hours_worked >= 0),
   photo_path text,
+  note text,
   created_by uuid not null references public.users(id) on delete restrict,
   created_at timestamptz not null default now(),
   constraint trip_sale_client_check check (
-    (sale_type = 'cash' and client_id is null) or (sale_type = 'credit' and client_id is not null)
+    -- Hisobga savdo: mijoz majburiy. Naqd savdo: mijoz ixtiyoriy —
+    -- yuk kimka tashilganini qayd qilish uchun tanlanadi va balansga ta'sir qilmaydi.
+    (sale_type = 'credit' and client_id is not null) or (sale_type = 'cash')
   )
+);
+-- `create table if not exists` mavjud bazani yangimaydi — shu satrlar eski
+-- bazalarni ham shu fayl qayta ishga tushirilganda yangilaydi.
+alter table public.trips add column if not exists note text;
+alter table public.trips drop constraint if exists trip_sale_client_check;
+alter table public.trips add constraint trip_sale_client_check check (
+  (sale_type = 'credit' and client_id is not null) or (sale_type = 'cash')
 );
 create index if not exists trips_created_at_idx on public.trips(created_at desc);
 create index if not exists trips_driver_date_idx on public.trips(driver_id, created_at desc);
@@ -314,8 +324,8 @@ set search_path = public
 as $$
 begin
   if new.sale_type = 'cash' then
-    insert into public.transactions (direction, category, amount, payment_method, vehicle_id, trip_id, note, created_by, created_at)
-    values ('in', 'cash_sale', new.total_amount, 'cash', new.vehicle_id, new.id, 'Naqd savdo · ' || new.id::text, new.created_by, new.created_at);
+    insert into public.transactions (direction, category, amount, payment_method, client_id, vehicle_id, trip_id, note, created_by, created_at)
+    values ('in', 'cash_sale', new.total_amount, 'cash', new.client_id, new.vehicle_id, new.id, 'Naqd savdo · ' || new.id::text, new.created_by, new.created_at);
   end if;
   return new;
 end;

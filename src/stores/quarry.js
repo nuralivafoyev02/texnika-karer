@@ -115,7 +115,7 @@ const mapTrip = (row) => ({
   materialId: row.material_id, weightTons: Number(row.weight_tons ?? 0), unitPrice: Number(row.unit_price ?? 0),
   totalAmount: Number(row.total_amount ?? 0), saleType: row.sale_type ?? 'credit',
   hoursWorked: Number(row.hours_worked ?? 0), photoPath: row.photo_path ?? '', photoUrl: '',
-  photoName: '', createdAt: row.created_at, createdBy: row.created_by,
+  photoName: '', note: row.note ?? '', createdAt: row.created_at, createdBy: row.created_by,
 })
 const mapTransaction = (row) => ({
   id: row.id, direction: row.direction, category: row.category, amount: Number(row.amount ?? 0),
@@ -322,8 +322,10 @@ export const useQuarryStore = defineStore('quarry', {
       return this.clients.find((client) => client.id === id)?.name ?? 'Noma’lum mijoz'
     },
     tripClient(trip) {
-      if (trip.saleType === 'cash' || !trip.clientId) return 'Naqd savdo'
-      return this.clients.find((client) => client.id === trip.clientId)?.name ?? 'Noma’lum mijoz'
+      // Mijoz har qanday savdo turida ham ko'rsatiladi: naqd reysda ham tanlangan
+      // mijoz jurnalda qoladi (balansga esa faqat credit reyslar ta'sir qiladi).
+      if (trip.clientId) return this.clients.find((client) => client.id === trip.clientId)?.name ?? 'Noma’lum mijoz'
+      return trip.saleType === 'cash' ? 'Naqd savdo' : 'Mijozsiz'
     },
     hasPhoto(trip) {
       return this.remoteMode ? Boolean(trip.photoPath) : Boolean(trip.photoUrl)
@@ -803,7 +805,10 @@ export const useQuarryStore = defineStore('quarry', {
       const weight = Number(payload.weightTons)
       if (!(weight > 0)) throw new Error('Og‘irlik 0 dan katta bo‘lishi kerak.')
       if (payload.saleType !== 'cash' && !payload.clientId) throw new Error('Mijozni tanlang.')
-      const clientId = payload.saleType === 'cash' ? null : payload.clientId
+      // Naqd savdoda mijoz ixtiyoriy: tanlansa, reysda yuk kimka tashilgani ko'rinadi
+      // (balansga esa qarz yozilmaydi — client_balances faqat credit reyslarni hisoblaydi).
+      const clientId = payload.clientId || null
+      const note = payload.note?.trim() || ''
       const id = this.remoteMode ? globalThis.crypto.randomUUID() : makeId('T')
       const createdAt = new Date().toISOString()
       const total = round2(weight * Number(material.unitPrice))
@@ -813,10 +818,21 @@ export const useQuarryStore = defineStore('quarry', {
           client_id: clientId,
           material_id: material.id, weight_tons: weight, unit_price: material.unitPrice,
           total_amount: total, sale_type: payload.saleType, hours_worked: Number(payload.hoursWorked || 0),
+          note: note || null,
           created_by: this.session.user.id,
         }
         const { data, error } = await supabase.from('trips').insert(row).select('*').single()
-        if (error) throw error
+        if (error) {
+          // Eski bazada naqd+ijoz yoki `note` ustuni bo'lmasa — foydalanuvchiga
+          // aniq qo'llanma ko'rsatamiz (schema.sql qayta ishga tushirish kerak).
+          if (error.code === '23514' && /trip_sale_client_check/.test(String(error.message ?? ''))) {
+            throw new Error('Naqd savdoda mijoz tanlash eski cheklovga to‘kramoqda — supabase/schema.sql faylini qayta ishga tushiring.')
+          }
+          if (/column .* does not exist/.test(String(error.message ?? ''))) {
+            throw new Error('Reys uchun izoh ustuni yo‘q — supabase/schema.sql faylini qayta ishga tushiring.')
+          }
+          throw new Error(readableDbError(error, 'Reysni saqlab bo‘lmadi.'))
+        }
         const trip = mapTrip(data)
         if (payload.photoFile) {
           const path = `${id}/${Date.now()}-${safeFileName(payload.photoFile.name)}`
@@ -839,11 +855,11 @@ export const useQuarryStore = defineStore('quarry', {
         id, vehicleId: vehicle.id, driverId: vehicle.driverId, clientId,
         materialId: material.id, weightTons: weight, unitPrice: material.unitPrice, totalAmount: total,
         saleType: payload.saleType, hoursWorked: Number(payload.hoursWorked || 0), photoUrl: await readDataUrl(payload.photoFile),
-        photoName: payload.photoFile?.name ?? '', createdAt, createdBy: this.activeUserId,
+        photoName: payload.photoFile?.name ?? '', note, createdAt, createdBy: this.activeUserId,
       }
       this.trips.unshift(trip)
       if (trip.saleType === 'cash') {
-        this.transactions.unshift({ id: makeId('TX'), direction: 'in', category: 'cash_sale', amount: total, paymentMethod: 'cash', clientId: null, driverId: null, vehicleId: vehicle.id, tripId: id, note: `Naqd savdo · ${id}`, createdAt })
+        this.transactions.unshift({ id: makeId('TX'), direction: 'in', category: 'cash_sale', amount: total, paymentMethod: 'cash', clientId, driverId: null, vehicleId: vehicle.id, tripId: id, note: `Naqd savdo · ${id}`, createdAt })
       }
       this.persistDemo()
       this.notify('Yangi reys muvaffaqiyatli saqlandi.')

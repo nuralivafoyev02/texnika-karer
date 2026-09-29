@@ -19,7 +19,7 @@ const photoError = ref('')
 const filteredTrips = computed(() => [...store.trips]
   .filter((trip) => {
     const search = query.value.trim().toLowerCase()
-    const joined = [trip.id, store.tripClient(trip), store.vehicleName(trip.vehicleId), store.driverName(trip.driverId), store.materialName(trip.materialId)].join(' ').toLowerCase()
+    const joined = [trip.id, store.tripClient(trip), store.vehicleName(trip.vehicleId), store.driverName(trip.driverId), store.materialName(trip.materialId), trip.note].join(' ').toLowerCase()
     return (!search || joined.includes(search)) && (period.value !== 'today' || isToday(trip.createdAt)) && (saleType.value === 'all' || trip.saleType === saleType.value)
   })
   .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)))
@@ -62,9 +62,9 @@ async function openPhoto(trip) {
           <thead><tr class="table-head border-b border-line"><th class="px-5 py-3">Reys / Sana</th><th class="px-4 py-3">Texnika / Haydovchi</th><th class="px-4 py-3">Mijoz</th><th class="px-4 py-3">Tosh turi</th><th class="px-4 py-3">Og‘irlik / vaqt</th><th class="px-4 py-3">Savdo turi</th><th class="px-5 py-3 text-right">Qiymati</th></tr></thead>
           <tbody>
             <tr v-for="trip in filteredTrips" :key="trip.id" class="border-b border-[#f0f2f0] last:border-0 hover:bg-[#fbfcfb]">
-              <td class="px-5 py-3.5"><div class="flex items-center gap-2"><p class="text-xs font-bold text-ink">{{ trip.id }}</p><button v-if="store.hasPhoto(trip)" class="grid h-6 w-6 place-items-center rounded-md bg-mint text-leaf hover:bg-[#dcece0]" title="Yuk fotosurati" @click="openPhoto(trip)"><Image :size="13" /></button></div><p class="mt-1 text-[10px] text-muted">{{ dateTime(trip.createdAt) }}</p></td>
+              <td class="px-5 py-3.5"><div class="flex items-center gap-2"><p class="text-xs font-bold text-ink">{{ trip.id }}</p><button v-if="store.hasPhoto(trip)" class="grid h-6 w-6 place-items-center rounded-md bg-mint text-leaf hover:bg-[#dce9ff]" title="Yuk fotosurati" @click="openPhoto(trip)"><Image :size="13" /></button></div><p class="mt-1 text-[10px] text-muted">{{ dateTime(trip.createdAt) }}</p></td>
               <td class="px-4 py-3.5"><p class="text-xs font-semibold text-ink">{{ store.vehicles.find((v) => v.id === trip.vehicleId)?.plate || '—' }}</p><p class="mt-1 text-[10px] text-muted">{{ store.driverName(trip.driverId) }}</p></td>
-              <td class="max-w-[180px] px-4 py-3.5"><p class="truncate text-xs text-ink">{{ store.tripClient(trip) }}</p></td>
+              <td class="max-w-[180px] px-4 py-3.5"><p class="truncate text-xs text-ink">{{ store.tripClient(trip) }}</p><p v-if="trip.note" class="mt-1 truncate text-[10px] text-muted" :title="trip.note">{{ trip.note }}</p></td>
               <td class="px-4 py-3.5"><span class="tag tag-blue">{{ store.materialName(trip.materialId) }}</span></td>
               <td class="px-4 py-3.5"><p class="text-xs font-bold text-ink">{{ number(trip.weightTons, 1) }} t</p><p class="mt-1 text-[10px] text-muted">{{ number(trip.hoursWorked, 1) }} soat</p></td>
               <td class="px-4 py-3.5"><span :class="trip.saleType === 'cash' ? 'tag-cash' : 'tag-credit'" class="tag">{{ trip.saleType === 'cash' ? 'Naqd' : 'Hisobga' }}</span></td>

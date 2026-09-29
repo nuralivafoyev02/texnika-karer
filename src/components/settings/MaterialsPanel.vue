@@ -102,11 +102,11 @@ async function removeMaterial(material) {
         </form>
       </section>
 
-      <section class="flex items-start gap-3 rounded-2xl border border-[#cfe0d3] bg-[#f2f8f3] p-4">
+      <section class="flex items-start gap-3 rounded-2xl border border-[#d8e4f5] bg-[#f4f8ff] p-4">
         <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><ShieldCheck :size="17" /></div>
         <div>
           <p class="text-xs font-bold text-forest">Nega o‘chirib bo‘lmaydi?</p>
-          <p class="mt-1 text-[11px] leading-5 text-[#66816e]">Reyslarda ishlatilgan mahsulot bazada cheklangan bog‘lanish bilan himoyalangan. Bunday holatda tizim o‘zi bloklaydi va nechta reysda ishlatilganini sabab sifatida ko‘rsatadi.</p>
+          <p class="mt-1 text-[11px] leading-5 text-[#5b7295]">Reysda ishlatilgan mahsulot o‘chirilmaydi — tizim ishlatilganligini sabab sifatida ko‘rsatadi.</p>
         </div>
       </section>
     </aside>

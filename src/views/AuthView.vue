@@ -31,20 +31,20 @@ async function submit() {
 
 <template>
   <main class="flex min-h-screen bg-white">
-    <section class="relative hidden w-[48%] flex-col justify-between overflow-hidden bg-[#153c2b] p-12 text-white lg:flex">
+    <section class="relative hidden w-[48%] flex-col justify-between overflow-hidden bg-[#0b2f5e] p-12 text-white lg:flex">
       <div class="absolute -right-24 -top-28 h-[420px] w-[420px] rounded-full border border-white/10"></div><div class="absolute -right-8 -top-12 h-[290px] w-[290px] rounded-full border border-white/10"></div>
-      <div class="relative z-10 flex items-center gap-3"><div class="brand-mark"><span></span><span></span><span></span></div><div class="brand-copy"><strong>AliBuilding<span style="color:#9fd1ac">.</span></strong><small>KARER BOSHQARUVI</small></div></div>
+      <div class="relative z-10 flex items-center gap-3"><div class="brand-mark"><span></span><span></span><span></span></div><div class="brand-copy"><strong>AliBuilding<span style="color:#7db3ff">.</span></strong><small>KARER BOSHQARUVI</small></div></div>
       <div class="relative z-10 max-w-[490px]">
-        <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.15em] text-[#bed8c6]"><ShieldCheck :size="14" /> Boshqaruv bir joyda</div>
-        <h1 class="text-[42px] font-semibold leading-[1.12] tracking-[-.045em]">Karer ishini<br><span class="text-[#9fd1ac]">aniq nazorat</span> qiling.</h1>
-        <p class="mt-5 max-w-[400px] text-sm leading-6 text-[#b6cfbe]">Reyslar, texnika, mijozlar balansi va kunlik moliya — jamoangiz uchun yagona tizimda.</p>
+        <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.15em] text-[#bed6f5]"><ShieldCheck :size="14" /> Boshqaruv bir joyda</div>
+        <h1 class="text-[42px] font-semibold leading-[1.12] tracking-[-.045em]">Karer ishini<br><span class="text-[#7db3ff]">aniq nazorat</span> qiling.</h1>
+        <p class="mt-5 max-w-[400px] text-sm leading-6 text-[#b6cbe8]">Reyslar, texnika, mijozlar balansi va kunlik moliya — jamoangiz uchun yagona tizimda.</p>
         <div class="mt-9 grid grid-cols-3 gap-3">
-          <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p class="text-lg font-bold">Reyslar</p><p class="mt-1 text-[10px] text-[#aac3b2]">tonna va tushum nazorati</p></div>
-          <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p class="text-lg font-bold">Ruxsatlar</p><p class="mt-1 text-[10px] text-[#aac3b2]">lavozimga qarab kirish</p></div>
-          <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p class="text-lg font-bold">Hisob-kitob</p><p class="mt-1 text-[10px] text-[#aac3b2]">kassa va bank nazorati</p></div>
+          <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p class="text-lg font-bold">Reyslar</p><p class="mt-1 text-[10px] text-[#a8c4ea]">tonna va tushum nazorati</p></div>
+          <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p class="text-lg font-bold">Ruxsatlar</p><p class="mt-1 text-[10px] text-[#a8c4ea]">lavozimga qarab kirish</p></div>
+          <div class="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p class="text-lg font-bold">Hisob-kitob</p><p class="mt-1 text-[10px] text-[#a8c4ea]">kassa va bank nazorati</p></div>
         </div>
       </div>
-      <p class="relative z-10 text-[10px] text-[#84a591]">© {{ new Date().getFullYear() }} AliBuilding · Ichki foydalanish uchun</p>
+      <p class="relative z-10 text-[10px] text-[#84a3c9]">© {{ new Date().getFullYear() }} AliBuilding · Ichki foydalanish uchun</p>
     </section>
     <section class="flex flex-1 items-center justify-center px-6 py-12">
       <div class="w-full max-w-[390px]">

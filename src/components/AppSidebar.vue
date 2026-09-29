@@ -36,7 +36,7 @@ const groups = computed(() => {
   <aside class="sidebar">
     <div class="brand-lockup">
       <div class="brand-mark"><span></span><span></span><span></span></div>
-      <div class="brand-copy"><strong>AliBuilding<span style="color:#9fd1ac">.uz</span></strong><small>TEXNIKA BOSHQARUVI</small></div>
+      <div class="brand-copy"><strong>AliBuilding<span style="color:#7db3ff">.uz</span></strong><small>TEXNIKA BOSHQARUVI</small></div>
     </div>
     <nav class="sidebar-scroll" aria-label="Asosiy navigatsiya">
       <section v-for="group in groups" :key="group.title">
@@ -44,7 +44,7 @@ const groups = computed(() => {
         <RouterLink v-for="item in group.items" :key="item.to" :to="item.to" class="nav-link">
           <component :is="item.icon" class="nav-icon" :size="17" :stroke-width="1.8" />
           <span>{{ item.label }}</span>
-          <span v-if="item.accent" class="ml-auto h-1.5 w-1.5 rounded-full bg-[#9fd1ac]"></span>
+          <span v-if="item.accent" class="ml-auto h-1.5 w-1.5 rounded-full bg-[#7db3ff]"></span>
         </RouterLink>
       </section>
     </nav>
@@ -53,8 +53,8 @@ const groups = computed(() => {
         <span class="status-dot"></span>
         <span>{{ store.remoteMode ? 'Supabase bilan ulangan' : 'Demo ma’lumotlar rejimi' }}</span>
       </div> -->
-      <div class="mt-0 flex items-center justify-center px-0.5 text-[10px] text-[#7f9f8a]">
-        <span class="text-center font-semibold">v1.5.4</span>
+      <div class="mt-0 flex items-center justify-center px-0.5 text-[10px] text-[#7f9cc4]">
+        <span class="text-center font-semibold">v1.5.5</span>
       </div>
     </div>
   </aside>
