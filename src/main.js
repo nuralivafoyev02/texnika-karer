@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, watch } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import { router } from './router'
@@ -23,19 +23,32 @@ const prefetchSections = () => {
   sections.forEach((load, index) => setTimeout(() => load().catch(() => {}), index * 80))
 }
 
-async function bootstrap() {
+function bootstrap() {
   const app = createApp(App)
   const pinia = createPinia()
   app.use(pinia)
-
-  const store = useQuarryStore(pinia)
-  await store.initialize()
   app.use(router)
-  await router.isReady()
+
+  // Skeleton darhol ko'rinsin: mount'dan OLDIN ma'lumotni kutmaymiz. Ilova o'z
+  // skeletoni ko'rsatadi, router esa birinchi navigatsiyani `store.whenReady()`
+  // da ushlab turadi — ruxsatlar kelmagandan oldin qaror qabul qilinmaydi.
   app.mount('#app')
 
+  const store = useQuarryStore(pinia)
+  store.initialize()
+
   if (typeof window !== 'undefined') {
-    const warm = () => prefetchSections()
+    // Bo'lim modullarini faqat dastlabki ma'lumot yuklanib bo'lgandan keyin
+    // oldindan yuklaymiz, aks holda ular asosiy so'rovlar bilan band bo'ladi.
+    const warm = () => {
+      const start = () => setTimeout(prefetchSections, 400)
+      if (!store.loading) return start()
+      const stop = watch(() => store.loading, (busy) => {
+        if (busy) return
+        stop()
+        start()
+      })
+    }
     if ('requestIdleCallback' in window) window.requestIdleCallback(warm, { timeout: 3000 })
     else setTimeout(warm, 1200)
   }

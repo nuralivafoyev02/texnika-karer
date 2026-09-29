@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { Plus, Search, UsersRound, ArrowDownLeft, ArrowUpRight, HandCoins, Phone, CircleDollarSign, ChevronRight, Building2 } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import ClientForm from '../components/forms/ClientForm.vue'
@@ -7,9 +8,12 @@ import { phoneHref } from '../lib/phone'
 import PaymentForm from '../components/forms/PaymentForm.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { initials, money } from '../lib/format'
+import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
-const search = ref('')
+const route = useRoute()
+// Global qidiruvdan kelgan ?q= bilan ochilsa, ro'yxat shu so'z bo'yicha filtrlanadi.
+const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const showNewClient = ref(false)
 const showPayment = ref(false)
 const selectedClientId = ref('')
@@ -37,7 +41,7 @@ function openPayment(clientId = '') { selectedClientId.value = clientId; showPay
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><UsersRound :size="15" /> Mijozlar bilan ishlash</div><h1 class="page-title">Mijozlar</h1><p class="page-subtitle">Mijozlar ro‘yxati, hisob-kitob va avanslarni nazorat qiling.</p></div>
+      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><UsersRound :size="15" /> Mijozlar bilan ishlash</div><h1 class="page-title">Mijozlar</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div>
       <div class="flex gap-2"><button v-if="store.can('finance.payments.create')" class="btn-secondary" @click="openPayment()"><CircleDollarSign :size="16" /> To‘lov kiritish</button><button v-if="store.can('clients.manage')" class="btn-primary" @click="showNewClient = true"><Plus :size="17" /> Yangi mijoz</button></div>
     </div>
 

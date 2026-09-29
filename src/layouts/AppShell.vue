@@ -11,6 +11,12 @@ const store = useQuarryStore()
 
 <template>
   <div class="app-shell">
+    <!-- Fon yangilanishi: cache'dagi ma'lumot o'z joyida qoladi, faqat yuqorida
+         ingichka chiziq aylanadi. Skeleton bu holatda qaytmaydi. -->
+    <div v-if="store.refreshing" class="refresh-bar" role="status" aria-live="polite">
+      <span></span>
+      <span class="sr-only">Ma’lumotlar yangilanmoqda…</span>
+    </div>
     <AppSidebar />
     <div class="app-content">
       <AppHeader />

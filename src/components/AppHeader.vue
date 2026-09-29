@@ -1,10 +1,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Bell, ChevronDown, ArrowUpRight, Wrench, LogOut, CheckCheck, Trash2, Settings } from 'lucide-vue-next'
+import { Search, Bell, ChevronDown, Wrench, LogOut, CheckCheck, Trash2, Settings, BookOpen, LayoutGrid, ClipboardList, UsersRound, Truck } from 'lucide-vue-next'
 import { useQuarryStore } from '../stores/quarry'
-import { dateLong, dateTime, initials } from '../lib/format'
+import { dateLong, dateTime, initials, number } from '../lib/format'
+import { availableSections } from '../lib/guide'
 import ProfileEditor from './forms/ProfileEditor.vue'
+import GuideModal from './GuideModal.vue'
 
 const store = useQuarryStore()
 const route = useRoute()
@@ -12,11 +14,16 @@ const router = useRouter()
 const showUsers = ref(false)
 const showAlerts = ref(false)
 const showProfile = ref(false)
+const showGuide = ref(false)
 const userMenu = ref(null)
 const alertMenu = ref(null)
 const avatarUrl = ref('')
 const searchInput = ref('')
 const searchField = ref(null)
+const searchWrap = ref(null)
+const searchFocused = ref(false)
+const suggestionsDismissed = ref(false)
+const activeSuggestion = ref(-1)
 const title = computed(() => route.meta.title || 'Texnika')
 const today = dateLong()
 const availableReports = computed(() => {
@@ -27,16 +34,123 @@ const availableReports = computed(() => {
 const sortedReports = computed(() => availableReports.value.slice(0, 5))
 const userOptions = computed(() => store.users.filter((user) => user.isActive))
 
+// ── Global qidiruv ───────────────────────────────────────────────────────────
+// Maydon faol yoki ichida matn bo'lganda KENGAYADI (animatsiya CSS'da).
+// Esc fokusni olib tashlaydi, lekin matn qolgan bo'lsa kenglik saqlanadi —
+// shu sababli `searchExpanded` faqat "fokus YOKI matn" ga bog'liq.
+const searchTerm = computed(() => searchInput.value.trim())
+const searchExpanded = computed(() => searchFocused.value || searchTerm.value.length > 0)
+
+// Tavsiyalar: bo'limlar (faqat ruxsat berilganlar), reyslar, mijozlar va
+// texnikalar. Har bir band tegishli sahifaga o'tadi; oxirida to'liq qidiruv bandi turadi.
+const suggestions = computed(() => {
+  const term = searchTerm.value.toLowerCase()
+  if (!term) return []
+  const items = []
+  availableSections(store)
+    .filter((section) => `${section.title} ${section.eyebrow} ${section.short}`.toLowerCase().includes(term))
+    .forEach((section) => items.push({ id: `section-${section.id}`, icon: LayoutGrid, label: section.title, hint: section.short, kind: 'Bo‘lim', to: { path: section.route } }))
+  if (store.can('trips.view')) {
+    store.trips
+      .filter((trip) => [trip.id, store.tripClient(trip), store.vehicleName(trip.vehicleId), store.driverName(trip.driverId), store.materialName(trip.materialId)].join(' ').toLowerCase().includes(term))
+      .slice(0, 3)
+      .forEach((trip) => items.push({
+        id: `trip-${trip.id}`,
+        icon: ClipboardList,
+        label: `${store.vehicleName(trip.vehicleId)} · ${store.tripClient(trip) || 'mijozsiz'}`,
+        hint: `${number(trip.weightTons)} t · ${dateTime(trip.createdAt)}`,
+        kind: 'Reys',
+        to: { path: '/trips', query: { q: trip.id } },
+      }))
+  }
+  if (store.can('clients.view')) {
+    store.clients
+      .filter((client) => `${client.name} ${client.contactName} ${client.phone}`.toLowerCase().includes(term))
+      .slice(0, 2)
+      .forEach((client) => items.push({ id: `client-${client.id}`, icon: UsersRound, label: client.name, hint: client.contactName || client.phone || 'Mijoz', kind: 'Mijoz', to: { path: '/clients', query: { q: client.name } } }))
+  }
+  if (store.can('fleet.view')) {
+    store.vehicles
+      .filter((vehicle) => `${vehicle.plate} ${vehicle.model} ${store.driverName(vehicle.driverId)}`.toLowerCase().includes(term))
+      .slice(0, 2)
+      .forEach((vehicle) => items.push({
+        id: `vehicle-${vehicle.id}`,
+        icon: Truck,
+        label: `${vehicle.plate} ${vehicle.model}`.trim(),
+        hint: store.driverName(vehicle.driverId) || 'Haydovchi biriktirilmagan',
+        kind: 'Texnika',
+        to: { path: '/fleet', query: { q: vehicle.plate } },
+      }))
+  }
+  const limited = items.slice(0, 7)
+  if (store.can('trips.view')) limited.push({ id: 'all-trips', icon: Search, label: `«${searchTerm.value}» — reyslarda to‘liq qidirish`, hint: 'Reyslar jurnalida barcha mos natijalar', kind: 'Enter', to: { path: '/trips', query: { q: searchTerm.value } } })
+  return limited
+})
+const showSuggestions = computed(() => searchFocused.value && !suggestionsDismissed.value && !!searchTerm.value)
+
 function submitSearch() {
-  const term = searchInput.value.trim()
-  if (!term) return
-  router.push({ path: '/trips', query: { q: term } })
+  if (!searchTerm.value) return
+  if (store.can('trips.view')) {
+    pickSuggestion({ to: { path: '/trips', query: { q: searchTerm.value } } })
+    return
+  }
+  // Reyslarga ruxsati yo'q foydalanuvchi uchun — kamida birinchi mos bo'lim.
+  if (suggestions.value.length) pickSuggestion(suggestions.value[0])
 }
+function pickSuggestion(item) {
+  suggestionsDismissed.value = true
+  searchField.value?.blur()
+  router.push(item.to)
+}
+function onSearchFocus() {
+  searchFocused.value = true
+  suggestionsDismissed.value = false
+}
+function onSearchBlur() { searchFocused.value = false }
+function onSearchKeydown(event) {
+  if (event.key === 'Escape') {
+    // Esc — avval fokusni tashlaydi; matn bo'lsa kenglik saqlanib qoladi.
+    suggestionsDismissed.value = true
+    searchField.value?.blur()
+    return
+  }
+  if (!showSuggestions.value) {
+    if (event.key === 'Enter') submitSearch()
+    return
+  }
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    activeSuggestion.value = (activeSuggestion.value + 1) % suggestions.value.length
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    activeSuggestion.value = (activeSuggestion.value - 1 + suggestions.value.length) % suggestions.value.length
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    const item = activeSuggestion.value >= 0 ? suggestions.value[activeSuggestion.value] : null
+    if (item) pickSuggestion(item)
+    else submitSearch()
+  }
+}
+// Matn o'zgarganda yopilgan tavsiyalar qayta ochiladi va tanlash indeksi nolga qaytadi.
+watch(searchTerm, () => {
+  suggestionsDismissed.value = false
+  activeSuggestion.value = -1
+})
+
 function onShortcut(event) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault()
+    suggestionsDismissed.value = false
     searchField.value?.focus()
+    // Ikkinchi bosish — mavjud matnni belgilash (qayta yozish osonroq).
+    if (document.activeElement === searchField.value) searchField.value?.select()
   }
+}
+
+function openGuide() {
+  // Yo'riqnoma modali ochilganda menyudagi hech narsa tagida qolib ketmasligi kerak.
+  showUsers.value = false
+  showGuide.value = true
 }
 
 // ── Dropdown yopilishi ──────────────────────────────────────────────────────
@@ -108,14 +222,32 @@ async function logout() {
       <div class="header-title">{{ title }}</div>
     </div>
     <div class="flex min-w-0 items-center gap-3">
-      <label class="header-search" aria-label="Qidiruv">
-        <Search :size="16" />
-        <input ref="searchField" v-model="searchInput" type="search" placeholder="Qidirish..." @keydown.enter="submitSearch" />
-        <span class="rounded-md border border-line px-1.5 py-0.5 text-[9px] font-bold text-slate-400">⌘+K</span>
-      </label>
-      <button v-if="store.can('trips.create')" class="btn-primary !hidden !rounded-xl !px-3.5 !py-2.5 sm:!inline-flex" @click="router.push('/scale')">
-        <ArrowUpRight :size="16" /> Yangi reys
-      </button>
+      <div ref="searchWrap" class="header-search-wrap">
+        <label class="header-search" :class="{ 'is-open': searchExpanded }" aria-label="Qidiruv">
+          <Search :size="15" class="shrink-0" />
+          <input ref="searchField" v-model="searchInput" type="search" placeholder="Qidirish..." @focus="onSearchFocus" @blur="onSearchBlur" @keydown="onSearchKeydown" />
+          <span class="search-kbd">{{ searchFocused ? 'esc' : '⌘K' }}</span>
+        </label>
+        <!-- Tavsiyalar: natijalar bo'lim (ruxsatga qarab), reys, mijoz va texnika
+             bo'yicha chiqadi. Chapdan o'ngga: ikona, nom, izoh va tur. -->
+        <Transition name="dropdown">
+          <div v-if="showSuggestions" class="search-suggestions" role="listbox" aria-label="Qidiruv natijalari">
+            <div class="search-suggestions-panel" @mousedown.prevent>
+              <template v-if="suggestions.length">
+                <button v-for="(item, index) in suggestions" :key="item.id" class="search-item" :class="{ 'is-active': index === activeSuggestion }" role="option" :aria-selected="index === activeSuggestion" @click="pickSuggestion(item)" @mouseenter="activeSuggestion = index">
+                  <span class="search-item-icon"><component :is="item.icon" :size="14" /></span>
+                  <span class="search-item-text">
+                    <span class="search-item-label">{{ item.label }}</span>
+                    <span class="search-item-hint">{{ item.hint }}</span>
+                  </span>
+                  <span class="search-item-kind">{{ item.kind }}</span>
+                </button>
+              </template>
+              <p v-else class="search-empty">«{{ searchTerm }}» bo‘yicha hech narsa topilmadi.<template v-if="store.can('trips.view')"> Reyslar jurnalida qidirish uchun <kbd>Enter</kbd> bosing.</template></p>
+            </div>
+          </div>
+        </Transition>
+      </div>
       <div ref="alertMenu" class="relative">
         <button class="header-icon-btn" aria-label="Bildirishnomalar" :aria-expanded="showAlerts" @click="showAlerts = !showAlerts; showUsers = false">
           <Bell :size="17" />
@@ -176,6 +308,15 @@ async function logout() {
                 <span v-if="store.currentUser?.id === user.id" class="h-2 w-2 rounded-full bg-leaf"></span>
               </button>
             </div>
+            <!-- Yo'riqnoma: ruxsatlar katalogidan foydalanuvchining dostupiga qarab
+                 to'ldirilgan to'liq qo'llanma shu tugma orqali ochiladi. -->
+            <button class="header-menu-item mt-1" @click="openGuide">
+              <div class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-mint text-leaf"><BookOpen :size="15" /></div>
+              <div class="min-w-0 flex-1 text-left">
+                <p class="text-xs font-bold">Foydalanish yo‘riqnasi</p>
+                <p class="text-[10px] text-muted">Bo‘limlar, imkoniyatlar va ruxsatlar</p>
+              </div>
+            </button>
             <button v-if="!store.remoteMode" class="header-menu-item mt-1 text-danger" @click="clearDemo"><Trash2 :size="15" />Demo yozuvlarni tozalash</button>
             <button v-if="store.remoteMode" class="header-menu-item mt-1 text-danger" @click="logout"><LogOut :size="15" />Tizimdan chiqish</button>
             </div>
@@ -185,4 +326,5 @@ async function logout() {
     </div>
   </header>
   <ProfileEditor v-model="showProfile" />
+  <GuideModal v-model="showGuide" />
 </template>

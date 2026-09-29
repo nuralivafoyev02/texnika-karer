@@ -289,8 +289,18 @@ button:disabled {
   font-weight: 700;
 }
 
+/* Qidiruv sarlavha yonida joylashgan konteyner: kengaygan maydon va ostidagi
+   tavsiyalar paneli uchun nisbiy anakonda sifatida xizmat qiladi. */
+.header-search-wrap {
+  position: relative;
+}
+
+/* Kichik holat (184px) → faol holat (400px): kenglik `width` orqali animatsiya
+   qilinadi, shuning uchun chiziq emas, maydon O'ZI uzayadi.
+   Matn qolganda (Esc bosilgandan keyin ham) kenglik saqlanadi — chunki
+   `is-open` klassi fokus yoki matn mavjudligiga bog'liq. */
 .header-search {
-  width: 250px;
+  width: 184px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -299,6 +309,18 @@ button:disabled {
   background: #fafcfb;
   padding: 8px 11px;
   border-radius: 11px;
+  transition: width .34s cubic-bezier(.16, 1, .3, 1), border-color .2s ease, box-shadow .2s ease;
+}
+
+.header-search.is-open {
+  width: 400px;
+  border-color: #d9e6dc;
+  background: #fff;
+}
+
+.header-search:focus-within {
+  border-color: #a8cdb4;
+  box-shadow: 0 0 0 3px rgba(42, 118, 80, .1);
 }
 
 .header-search input {
@@ -309,6 +331,154 @@ button:disabled {
   color: #17231d;
   font-size: 12px;
   background: transparent;
+}
+
+/* Type=search tugmasi kenglikni erkakcha o'zgartirib, animatsiyani buzadi. */
+.header-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Qisqa klaviatura maslahati: fokus yo'qda "⌘K", fokusda "esc" ko'rinadi —
+   foydalanuvchi Esc bosishni shu yerdan o'rganadi. */
+.search-kbd {
+  flex: 0 0 auto;
+  border: 1px solid #e9eeea;
+  border-radius: 6px;
+  background: #fff;
+  padding: 2px 5px;
+  color: #98a39c;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: lowercase;
+}
+
+.header-search.is-open .search-kbd {
+  color: #7b877f;
+  border-color: #d9e6dc;
+}
+
+/* ── Tavsiyalar paneli (global qidiruv natijalari) ──────────────────────────
+   Yuqori balandlik animatsiyasi dropdown tranzitsiyasi (grid 0fr → 1fr) bilan
+   bir xil: panel kontenti qanchalik baland bo'lsa ham tabiiy ochiladi. */
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  /* Panel maydonchaning kengligiga 1:1 bog'lanadi va uni bilan bir xil
+     tezlikda uzayadi — ochilishda "bir butun" ko'rinishi buzilmaydi. */
+  width: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  opacity: 1;
+  overflow: hidden;
+  z-index: 70;
+  transition: width .34s cubic-bezier(.16, 1, .3, 1);
+}
+
+.search-suggestions-panel {
+  min-height: 0;
+  max-height: min(60vh, 360px);
+  overflow-y: auto;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e7ece8;
+  border-radius: 14px;
+  box-shadow: 0 18px 55px rgba(25, 46, 33, .17);
+}
+
+.search-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+}
+
+.search-item:hover,
+.search-item.is-active {
+  background: #f2f7f3;
+}
+
+.search-item-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #edf4ef;
+  color: #2a7650;
+}
+
+.search-item-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.search-item-label {
+  overflow: hidden;
+  color: #1c2921;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search-item-hint {
+  overflow: hidden;
+  color: #8b968f;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search-item-kind {
+  flex: 0 0 auto;
+  color: #9aa69e;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.search-item.is-active .search-item-kind {
+  color: #2a7650;
+}
+
+.search-empty {
+  padding: 14px 10px;
+  color: #8b968f;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.search-empty kbd {
+  border: 1px solid #e7ece8;
+  border-radius: 5px;
+  background: #f5f7f5;
+  padding: 1px 4px;
+  color: #52615a;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Harakatga sezgir foydalanuvchi: maydon darhol kengayadi/qisqaradi. */
+@media (prefers-reduced-motion: reduce) {
+  .header-search,
+  .search-suggestions {
+    transition: none;
+  }
 }
 
 .header-icon-btn {
@@ -510,6 +680,77 @@ button:disabled {
   background: #edf4fa;
 }
 
+/* ── Skeleton placeholder ───────────────────────────────────────────────────
+   Ma'lumot kelguncha ko'rsatiladigan "soy" bloklar. Bitta `.skeleton` klassi
+   fonini va yugish (shimmer) animatsiyasini beradi, qolgan o'lcham ham Tailwind
+   klasslari bilan beriladi (masalan `h-3 w-24 rounded-md`).
+   Yorqin yondashuv (prefers-reduced-motion) blokni statik qoldiradi. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #e9eeea;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .72), transparent);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+
+/* Yumshoq fon (kartochka usti) — skelet ichidagi qatorlar yumshoqroq bo'lsin. */
+.skeleton-soft {
+  background: #f0f4f1;
+}
+
+.skeleton-round {
+  border-radius: 999px;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Fon yuklanayotganini bildiruvchi ingichka chiziq: cache'dagi ma'lumot esa
+   o'z joyida qoladi, faqat yuqorida juda nozik indikator aylanadi. */
+.refresh-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 60;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(23, 74, 50, .1);
+}
+
+.refresh-bar span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: #2a7650;
+  animation: loading 1.15s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .skeleton::after,
+  .refresh-bar span {
+    animation: none;
+    transform: none;
+  }
+}
+
 .loading-screen {
   min-height: 100vh;
   display: flex;
@@ -699,7 +940,11 @@ button:disabled {
   }
 
   .header-search {
-    width: 200px;
+    width: 168px;
+  }
+
+  .header-search.is-open {
+    width: 330px;
   }
 }
 

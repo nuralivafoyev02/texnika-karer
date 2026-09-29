@@ -5,6 +5,7 @@ import { Search, Plus, Image, Download, Weight, Truck } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { dateTime, money, number, isToday } from '../lib/format'
+import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
 const route = useRoute()
@@ -41,7 +42,7 @@ async function openPhoto(trip) {
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Weight :size="15" /> Ishlab chiqarish</div><h1 class="page-title">Reyslar jurnali</h1><p class="page-subtitle">Karerdan chiqqan har bir samosval reysi va yuk tafsilotlari.</p></div>
+      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Weight :size="15" /> Ishlab chiqarish</div><h1 class="page-title">Reyslar jurnali</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div>
       <button v-if="store.can('trips.create')" class="btn-primary" @click="router.push('/scale')"><Plus :size="17" /> Yangi reys kiritish</button>
     </div>
 

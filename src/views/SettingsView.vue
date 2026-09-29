@@ -1,14 +1,17 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ShieldCheck, Plus, Pencil, Trash2, Package, CircleAlert, UsersRound, LockKeyhole, WalletCards, Settings2 } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import RoleEditor from '../components/forms/RoleEditor.vue'
 import MaterialsPanel from '../components/settings/MaterialsPanel.vue'
 import FinanceCategoriesPanel from '../components/settings/FinanceCategoriesPanel.vue'
 import { PERMISSION_CATALOG } from '../lib/permissions'
+import { sectionShort } from '../lib/guide'
 import { useQuarryStore } from '../stores/quarry'
 
 const store = useQuarryStore()
+const route = useRoute()
 
 // Yangi tablar: *create — faqat qo'shish, *manage — to'liq boshqaruv (qo'shish + tahrirlash + o'chirish).
 const tabs = computed(() => [
@@ -63,7 +66,7 @@ async function removeRole(role) {
       <div>
         <div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Settings2 :size="15" /> Tizim sozlamalari</div>
         <h1 class="page-title">Sozlamalar</h1>
-        <p class="page-subtitle">Lavozim va ruxsatlar, mahsulot narxlari hamda moliya turlari — barchasi bitta joyda.</p>
+        <p class="page-subtitle">{{ sectionShort(route.path) }}</p>
       </div>
       <button v-if="activeTab === 'roles' && store.can('roles.manage')" class="btn-primary" @click="openRole()"><Plus :size="16" /> Yangi lavozim</button>
     </div>

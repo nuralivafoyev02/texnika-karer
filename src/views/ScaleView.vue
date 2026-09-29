@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Scale, Truck, UserRound, UsersRound, Camera, ImagePlus, CircleCheck, ArrowLeft,
   Weight, Clock3, Coins, Sparkles, ChevronDown, X, ClipboardCheck, Plus,
@@ -9,9 +9,11 @@ import ModalDialog from '../components/ModalDialog.vue'
 import VehicleForm from '../components/forms/VehicleForm.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { money, number, dateTime, initials } from '../lib/format'
+import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
 const router = useRouter()
+const route = useRoute()
 const form = reactive({ vehicleId: '', saleType: 'credit', clientId: '', materialId: '', weightTons: '', hoursWorked: '1.2' })
 const photoFile = ref(null)
 const photoPreview = ref('')
@@ -79,7 +81,7 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
   <div class="mx-auto max-w-[1150px] space-y-5">
     <button class="btn-quiet !px-1 !py-1 text-xs" @click="router.push('/trips')"><ArrowLeft :size="15" /> Reyslar jurnaliga qaytish</button>
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Scale :size="15" /> Tarozixona</div><h1 class="page-title">Yangi reys</h1><p class="page-subtitle">Yuk ma’lumotlarini tekshirib, reysni tasdiqlang.</p></div>
+      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Scale :size="15" /> Tarozixona</div><h1 class="page-title">Yangi reys</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div>
       <div v-if="activeVehicles.length" class="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs text-muted"><span class="status-dot"></span> {{ activeVehicles.length }} ta faol texnika</div>
     </div>
 

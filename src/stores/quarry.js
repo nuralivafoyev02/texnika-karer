@@ -133,6 +133,22 @@ const mapCategory = (row) => ({
   needsDriver: row.needs_driver === true, isActive: row.is_active !== false, isSystem: row.is_system === true,
 })
 
+// Ilova mount qilingandan keyin `initialize()` fon ishlaydi. Router shu paytda
+// ruxsatlarni hali bilmaydi (`can()` har doim false qaytaradi), shuning uchun
+// birinchi navigatsiyani initialize tugaguncha ushlab turamiz — aks holda foydalanuvchi
+// noto'g'ri sahifaga tashlanib qolardi. Promise reaktiv emas, shuning uchun modul
+// darajasida saqlanadi (store'ga qo'yilsa, har o'zgarishda qayta seryalizatsiya bo'lardi).
+// Eshik modul yuklanganda yaratiladi: `initialize()` `whenReady()` dan OLDIN ham
+// chaqirilishi mumkin (demo rejimi), aks holda eshik hech qachon ochilmasdi.
+let bootResolve = null
+let bootSettled = false
+const bootPromise = new Promise((resolve) => { bootResolve = resolve })
+const openBootGate = () => {
+  if (bootSettled) return
+  bootSettled = true
+  bootResolve?.()
+}
+
 export const useQuarryStore = defineStore('quarry', {
   state: () => {
     const blank = createDemoData()
@@ -188,6 +204,16 @@ export const useQuarryStore = defineStore('quarry', {
     // "To'liq dostub" kalitlari: bazadan yuklangan katalog, yo'q bo'lsa lokal ko'rsatma.
     fullAccessKeys(state) {
       return state.permissionKeys.length ? state.permissionKeys : FULL_ACCESS_KEYS
+    },
+    // Ma'lumot kelguncha (cache ham bo'lmasa) o'rniga skeleton ko'rsatamiz.
+    // Keshdan hydrate bo'lgan holatda `loadedUserId` darhol to'g'rlanadi, ya'ni real
+    // ma'lumot ko'rinadi va fon yangilanishi skeletonni qaytarib keltirmaydi.
+    // Xato holatida ham skeletonni ko'rsatmaymiz — aks holda xato matni ko'rinmay qolardi.
+    bootstrapping(state) {
+      if (!state.remoteMode) return false
+      if (state.authError || state.dataError) return false
+      const userId = state.session?.user?.id
+      return Boolean(userId) && state.loadedUserId !== userId
     },
     // materials.create — faqat qo'shish; materials.manage — qo'shish, narx va o'chirish.
     canCreateMaterial() {
@@ -265,6 +291,11 @@ export const useQuarryStore = defineStore('quarry', {
     },
   },
   actions: {
+    // Router shu yerda kutadi: sessiya va birinchi ma'lumot hali kelmaganda
+    // ruxsat tekshiruvi noto'g'ri qaror qabul qilishi mumkin.
+    whenReady() {
+      return bootSettled ? Promise.resolve() : bootPromise
+    },
     can(permission) {
       if (!this.currentUser || !this.currentRole || !this.currentUser.isActive) return false
       return this.currentRole.permissions?.includes(permission) ?? false
@@ -436,6 +467,10 @@ export const useQuarryStore = defineStore('quarry', {
       if (!this.remoteMode) {
         this.ready = true
         this.persistDemo()
+        // Demo rejimida `try/finally` ga umuman kirilmaydi, shuning uchun eshikni
+        // shu yerda ochamiz — aks holda router birinchi navigatsiyani kutishda
+        // qolib ketar edi.
+        openBootGate()
         return
       }
       this.loading = true
@@ -462,6 +497,8 @@ export const useQuarryStore = defineStore('quarry', {
       } finally {
         this.loading = false
         this.ready = true
+        // Navigatsiyani ushlab turgan eshikni ochamiz — endi ruxsatlar ma'lum.
+        openBootGate()
       }
     },
     async signIn(login, password) {

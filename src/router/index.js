@@ -19,8 +19,12 @@ export const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const store = useQuarryStore()
+  // Ilova mount qilingachon ma'lumot yuklanadi; ruxsatlar kelgunga qadar
+  // kutamiz, aks holda `can()` false qaytarib, foydalanuvchini "ruxsat yo'q"
+  // sahifasiga tashlaydi.
+  await store.whenReady()
   const singlePermission = to.meta.permission
   const anyPermissions = to.meta.permissionAny
   if (singlePermission && !store.can(singlePermission)) return store.homeRoute.name === to.name ? true : store.homeRoute

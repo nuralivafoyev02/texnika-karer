@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { CircleDollarSign, ArrowDownToLine, ArrowUpFromLine, WalletCards, Banknote, Plus, Search, Download, ReceiptText, Fuel, Wrench, Pickaxe, BriefcaseBusiness, HandCoins, ArrowDownLeft, ArrowUpRight } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import PaymentForm from '../components/forms/PaymentForm.vue'
@@ -7,8 +8,10 @@ import ExpenseForm from '../components/forms/ExpenseForm.vue'
 import MetricCard from '../components/MetricCard.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { dateTime, money, isSameMonth } from '../lib/format'
+import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
+const route = useRoute()
 const filter = ref('all')
 const search = ref('')
 const showPayment = ref(false)
@@ -61,7 +64,7 @@ function exportCsv() {
 
 <template>
   <div class="space-y-6">
-    <div class="flex flex-wrap items-end justify-between gap-4"><div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><WalletCards :size="15" /> Hisob-kitob</div><h1 class="page-title">Moliya</h1><p class="page-subtitle">Pul oqimi, mijoz to‘lovlari va karer xarajatlarini boshqaring.</p></div><div class="flex flex-wrap gap-2"><button v-if="store.can('finance.payments.create')" class="btn-secondary" @click="showPayment = true"><ArrowDownToLine :size="16" /> Kirim</button><button v-if="store.can('finance.expenses.create')" class="btn-primary" @click="showExpense = true"><ArrowUpFromLine :size="16" /> Chiqim kiritish</button></div></div>
+    <div class="flex flex-wrap items-end justify-between gap-4"><div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><WalletCards :size="15" /> Hisob-kitob</div><h1 class="page-title">Moliya</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div><div class="flex flex-wrap gap-2"><button v-if="store.can('finance.payments.create')" class="btn-secondary" @click="showPayment = true"><ArrowDownToLine :size="16" /> Kirim</button><button v-if="store.can('finance.expenses.create')" class="btn-primary" @click="showExpense = true"><ArrowUpFromLine :size="16" /> Chiqim kiritish</button></div></div>
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="Naqd kassa qoldig‘i" :value="money(store.cashBalance, { short: true })" detail="Barcha naqd kirim − chiqim" :icon="Banknote" tone="amber" />

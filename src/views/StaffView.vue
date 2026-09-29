@@ -1,13 +1,16 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { UserRoundCog, Plus, Search, Phone, ShieldCheck, UsersRound, ArrowUpRight, UserPlus, KeyRound, Pencil, Copy, Check } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import StaffForm from '../components/forms/StaffForm.vue'
 import { phoneHref } from '../lib/phone'
 import { useQuarryStore } from '../stores/quarry'
 import { initials, money } from '../lib/format'
+import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
+const route = useRoute()
 const search = ref('')
 const showCreate = ref(false)
 const editing = ref(null)
@@ -59,7 +62,7 @@ async function copyCredentials() {
 
 <template>
   <div class="space-y-6">
-    <div class="flex flex-wrap items-end justify-between gap-4"><div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><UserRoundCog :size="15" /> Jamoa boshqaruvi</div><h1 class="page-title">Xodimlar</h1><p class="page-subtitle">Xodimlarning logini va parolini siz yaratasiz — email yoki taklif linkisiz.</p></div><button v-if="store.canManageStaff" class="btn-primary" @click="showCreate = true"><UserPlus :size="16" /> Xodim qo‘shish</button></div>
+    <div class="flex flex-wrap items-end justify-between gap-4"><div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><UserRoundCog :size="15" /> Jamoa boshqaruvi</div><h1 class="page-title">Xodimlar</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div><button v-if="store.canManageStaff" class="btn-primary" @click="showCreate = true"><UserPlus :size="16" /> Xodim qo‘shish</button></div>
 
     <section class="grid gap-4 sm:grid-cols-3"><article class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-mint text-leaf"><UsersRound :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Jami xodimlar</p><p class="mt-1 text-lg font-bold text-ink">{{ store.users.length }} <span class="text-xs font-medium text-muted">kishi</span></p></div></article><article class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#edf3fa] text-[#4f7595]"><ShieldCheck :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Faol lavozimlar</p><p class="mt-1 text-lg font-bold text-ink">{{ store.roles.length }} <span class="text-xs font-medium text-muted">rol</span></p></div></article><article class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#fff4e3] text-[#b77824]"><ArrowUpRight :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Lavozim biriktirilgan</p><p class="mt-1 text-lg font-bold text-ink">{{ rolesInUse }} <span class="text-xs font-medium text-muted">tur</span></p></div></article></section>
 

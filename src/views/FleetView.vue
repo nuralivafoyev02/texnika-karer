@@ -1,14 +1,18 @@
 <script setup>
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { Truck, Wrench, CircleAlert, CircleCheck, Gauge, Search, Settings2, Plus, Pencil, UserRoundPlus, Check, Copy } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
 import VehicleForm from '../components/forms/VehicleForm.vue'
 import StaffForm from '../components/forms/StaffForm.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { money, number, initials } from '../lib/format'
+import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
-const search = ref('')
+const route = useRoute()
+// Global qidiruvdan kelgan ?q= (masalan, avtomobil raqami) shu yerda filtrlanadi.
+const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const filter = ref('all')
 const showCreate = ref(false)
 const editing = ref(null)
@@ -81,7 +85,7 @@ function openDriverForm() { showCreate.value = false; showDriver.value = true }
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div><h1 class="page-title">Texnikalar</h1><p class="page-subtitle">Samosvallar ro‘yxati, haydovchilar va holati.</p></div>
+      <div><h1 class="page-title">Texnikalar</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div>
       <button v-if="canManage" class="btn-primary" @click="openCreate"><Plus :size="16" /> Texnika qo‘shish</button>
     </div>
 
