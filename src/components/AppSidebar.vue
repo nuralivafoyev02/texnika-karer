@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   LayoutDashboard, ClipboardList, Scale, UsersRound, Truck, WalletCards,
-  UserRoundCog, SlidersHorizontal, UserRound, Wrench,
+  UserRoundCog, SlidersHorizontal, UserRound, Wrench, ClipboardCheck,
 } from 'lucide-vue-next'
 import { useQuarryStore } from '../stores/quarry'
 
@@ -13,7 +13,9 @@ const groups = computed(() => {
     { label: 'Umumiy ko‘rinish', to: '/dashboard', permission: 'dashboard.view', icon: LayoutDashboard },
     { label: 'Reyslar jurnali', to: '/trips', permission: 'trips.view', icon: ClipboardList },
     { label: 'Yangi reys', to: '/scale', permission: 'trips.create', icon: Scale, accent: true },
-  ].filter((item) => store.can(item.permission))
+    // Monitoring is jarayonning davomi: reys yaratilgach u shu yerda tasdiqlanadi.
+    { label: 'Monitoring', to: '/monitoring', any: ['monitoring.view', 'monitoring.approve'], icon: ClipboardCheck, badge: store.pendingMonitoringCount },
+  ].filter((item) => (item.any ? item.any.some((permission) => store.can(permission)) : store.can(item.permission)))
   const resources = [
     { label: 'Mijozlar', to: '/clients', permission: 'clients.view', icon: UsersRound },
     { label: 'Texnikalar', to: '/fleet', permission: 'fleet.view', icon: Truck },
@@ -45,6 +47,7 @@ const groups = computed(() => {
         <RouterLink v-for="item in group.items" :key="item.to" :to="item.to" class="nav-link">
           <component :is="item.icon" class="nav-icon" :size="17" :stroke-width="1.8" />
           <span>{{ item.label }}</span>
+          <span v-if="item.badge" class="ml-auto rounded-full bg-[#fff2d9] px-1.5 py-0.5 text-[9px] font-bold text-[#96621d]">{{ item.badge }}</span>
           <span v-if="item.accent" class="ml-auto h-1.5 w-1.5 rounded-full bg-[#7db3ff]"></span>
         </RouterLink>
       </section>
@@ -55,7 +58,7 @@ const groups = computed(() => {
         <span>{{ store.remoteMode ? 'Supabase bilan ulangan' : 'Demo ma’lumotlar rejimi' }}</span>
       </div> -->
       <div class="mt-0 flex items-center justify-center px-0.5 text-[10px] text-[#7f9cc4]">
-        <span class="text-center font-semibold">v1.6.6</span>
+        <span class="text-center font-semibold">v1.9.1</span>
       </div>
     </div>
   </aside>

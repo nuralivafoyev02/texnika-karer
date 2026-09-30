@@ -46,7 +46,8 @@ export const GUIDE_SECTIONS = [
       'Reyslarni matn bo‘yicha qidirish (reys ID, mijoz, samosval, haydovchi, tosh turi, izoh)',
       'Bugungi yoki barcha sana filtri',
       'Naqd / hisobga savdo filtri',
-      'Ko‘rsatilgan reyslar uchun jami tonna va sotuv qiymati',
+      'Ko‘rsatilgan reyslar uchun jami tonna va sotuv qiymati (faqat tasdiqlanganlar)',
+      'Har bir reysning monitoring holati: «Kutilmoqda» yoki «Tasdiqlangan»',
       'Yuk fotosuratini ko‘rish (tarozidan olingan surat)',
       'Reys izohini ko‘rish — qaysi obyektga tashilgani jadvalda yoziladi',
     ],
@@ -55,7 +56,7 @@ export const GUIDE_SECTIONS = [
       'Sana va savdo turi filtrlarini kerak bo‘lsa o‘zgartiring.',
       'Fotosurati bor reys yonidagi rasm tugmasini bosing.',
     ],
-    tips: ['Reyslar «Yangi reys» sahifasidan tasdiqlanadi — bu yerda faqat ko‘riladi va qidiriladi.', 'Jadvalda ko‘rsatilgan qiymatlar filtrga mos keladigan reyslar bo‘yicha hisoblanadi.'],
+    tips: ['Har bir yangi reys avval «Kutilmoqda» bo‘ladi va monitoringda tasdiqlanishi kerak — «Yangi reysni avtomatik tasdiqlash» ruxsati berilgan xodimda esa reys darhol tasdiqlangan bo‘lib saqlanadi va monitoringga o‘tmaydi.', 'Jadvalda ko‘rsatilgan qiymatlar filtrga mos keladigan TASDIQLANGAN reyslar bo‘yicha hisoblanadi; kutilayotgan reyslar alohida ko‘rsatiladi.', 'Tonna narxi va reys qiymati faqat narxlarni ko‘rish ruxsati bor xodimga ko‘rinadi.'],
   },
   {
     id: 'scale',
@@ -63,8 +64,8 @@ export const GUIDE_SECTIONS = [
     permission: 'trips.create',
     title: 'Yangi reys',
     eyebrow: 'Tarozixona',
-    short: 'Yuk ma’lumotlarini tekshirib, reysni tasdiqlang.',
-    purpose: 'Tarozidan chiqqan yukni darhol kiritish: samosval, tosh turi, og‘irlik, soat va savdo turi. Summa avtomatik hisoblanadi, naqd savdo esa kassaga ham yoziladi.',
+    short: 'Yuk ma’lumotlarini tekshirib, reysni monitoringga yuboring.',
+    purpose: 'Tarozidan chiqqan yukni darhol kiritish: samosval, tosh turi, og‘irlik, soat va savdo turi. Summa serverda avtomatik hisoblanadi. Reys odatda monitoring navbatiga tushadi va tasdiqlangandan keyin mijoz balansiga (naqd savdoda — kassaga) yoziladi. Agar lavozimingizda «Yangi reysni avtomatik tasdiqlash» ruxsati bo‘lsa, reys monitoringga o‘tmaydi va darhol tasdiqlangan holda saqlanadi.',
     actions: [
       'Faol samosvalni tanlash (servisdagi texnika tanlanmaydi)',
       'Tosh turi va tonna narxini tanlash — summa o‘zi chiqadi',
@@ -78,9 +79,32 @@ export const GUIDE_SECTIONS = [
       'Tosh turini tanlang: tonna narxi sizning kiritgan qiymatingiz.',
       'Tarozidagi og‘irlikni kiriting (0 dan katta bo‘lishi shart).',
       'Savdo turini tanlang: «Hisobga» — mijoz majburiy, «Naqd» — mijoz ixtiyoriy (yuk kimka ekanini yozib qolish uchun).',
-      'Rasm qo‘shib, «Reyni tasdiqlash»ni bosing.',
+      'Rasm qo‘shib, «Reyni saqlash»ni bosing — reys monitoring navbatiga tushadi.',
     ],
-    tips: ['Tasdiqlangan reys narxi keyin o‘zgarmaydi — xato bo‘lsa tahrirlash o‘rniga yangi reys kiritish kerak.', 'Naqd reysda mijoz tanlansa, u jurnalda ko‘rinadi — balansga qarz yozilmaydi.', 'Servisdagi texnika reys uchun tanlanmaydi — avval holatini «Faol»ga qaytaring.'],
+    tips: ['Reys kiritgan xodim uni o‘zi tasdiqlay olmaydi: monitoring ruxsati alohida beriladi.', 'Tasdiqlangan reys narxi keyin o‘zgarmaydi — xato bo‘lsa monitoringda tasdiqlashni bekor qilib, xatoni ko‘rib chiqing.', 'Naqd reysda mijoz tanlansa, u jurnalda ko‘rinadi — balansga qarz yozilmaydi.', 'Servisdagi texnika reys uchun tanlanmaydi — avval holatini «Faol»ga qaytiring.'],
+  },
+  {
+    id: 'monitoring',
+    route: '/monitoring',
+    permissionAny: ['monitoring.view', 'monitoring.approve'],
+    title: 'Monitoring',
+    eyebrow: 'Tasdiqlash navbati',
+    short: 'Reys va xarajatlarni tasdiqlashdan oldingi nazorat nuqtasi.',
+    purpose: 'Yangi kiritilgan reyslar va karer xarajatlari shu yerda to‘planadi. Tasdiqlanmaguncha ular mijoz balansiga, kassaga, oylikka va hisobotlarda ko‘rinmaydi. Tasdiqlashni bekor qilsangiz, ta’sir butunlay qaytariladi.',
+    actions: [
+      'Reyslar va xarajatlari bo‘yicha ikkita alohida navbat',
+      'Holat filtri: kutilmoqda, tasdiqlangan yoki hammasi',
+      'Matn bo‘yicha qidirish (reys, mijoz, samosval, xarjat turi)',
+      'Qatorga bosib qisqa oynada tasdiqlash yoki tasdiqlashni bekor qilish',
+      'Monitoring izohi qo‘shish (ixtiyoriy)',
+    ],
+    steps: [
+      'Navbatdagi reysni bosib, og‘irlik, mijoz va savdo turini tekshiring.',
+      '«Tasdiqlash»ni bosing — reys balansga yoziladi, naqd savdoda esa kassaga tushadi.',
+      'Xarajatni xuddi shu tarzda tasdiqlang — u kassa qoldig‘idan ayriladi.',
+      'Xato yozuvni «Tasdiqlangan» filtridan topib, «Tasdiqlashni bekor qilish»ni bosing.',
+    ],
+    tips: ['Monitoring faqat CHIQIM yozuvlarini nazorat qiladi — mijoz to‘lovlari darhol hisobga olinadi.', 'Reyssiz (qo‘lda) naqd savdo kiritilsa, u monitoringga kirmaydi — chunki reysga bog‘liq emas.'],
   },
   {
     id: 'clients',
@@ -124,7 +148,7 @@ export const GUIDE_SECTIONS = [
       'Ta’mirga yuborish uchun holatni «Servisda»ga o‘zgartiring.',
       'Xabar kelganda banner yoki «Nosozliklar» ro‘yxatidan «Bajarildi»ni bosing.',
     ],
-    tips: ['Servisdagi texnika «Yangi reys» sahifasida tanlanmaydi.', 'Nosozlik haqida xabar berish uchun `maintenance.report` ruxsati kerak.'],
+    tips: ['Servisdagi texnika «Yangi reys» sahifasida tanlanmaydi.'],
   },
   {
     id: 'finance',
@@ -133,7 +157,7 @@ export const GUIDE_SECTIONS = [
     title: 'Moliya',
     eyebrow: 'Hisob-kitob',
     short: 'Pul oqimi, mijoz to‘lovlari va karer xarajatlarini boshqaring.',
-    purpose: 'Barcha kirim-chiqimlar: mijoz to‘lovlari, yoqilg‘i, ta’mir, ish haqi. Kassa va bank qoldig‘i shu yozuvlardan chiqadi.',
+    purpose: 'Barcha kirim-chiqimlar: mijoz to‘lovlari, yoqilg‘i, ta’mir, ish haqi. Kassa va bank qoldig‘i shu yozuvlardan chiqadi. Kiritilgan CHIQIM avval monitoringga tushadi va tasdiqlangandan keyin kassadan ayriladi.',
     actions: [
       'Mijozdan to‘lov kabul qilish (naqd yoki bank)',
       'Xarajat kiritish: yoqilg‘i, ta’mir, ish haqi, avans va boshqa turlar',
@@ -141,6 +165,7 @@ export const GUIDE_SECTIONS = [
       'Shu oygi xarajatlarning turlar bo‘yicha taqsimoti',
       'Jadvalni CSV faylga eksport qilish',
       'Har bir kirim va chiqimga izoh yozish — jurnalda «Tafsilot» sifatida ko‘rinadi',
+      'Chiqim qatoridagi monitoring holati (kutilmoqda / tasdiqlangan)',
     ],
     steps: [
       'To‘lov uchun «To‘lov kiritish»: tur, mijoz, summa, usul.',
@@ -148,7 +173,7 @@ export const GUIDE_SECTIONS = [
       'Ish haqi (payroll) yozuvida haydovchini tanlang — oylik hisoboti shundan chiqadi.',
       'Eksport tugmasi jadvaldagi joriy filtrni CSV sifatida yuklab oladi.',
     ],
-    tips: ['Naqd savdo reysi kassaga avtomatik kirim qilinadi — uni qo‘shatib yozmang.', 'To‘lov turi mijozga bog‘langan bo‘lsa (masalan «Mijoz to‘lovi»), mijozni tanlash shart.'],
+    tips: ['Kirimlar (mijoz to‘lovi, tasdiqlangan naqd savdo) darhol hisobga olinadi; chiqimlar esa monitoringdan o‘tishi shart.', 'Naqd savdo reysi kassaga monitoringda tasdiqlangandan keyin avtomatik kirim qilinadi — uni qo‘shatib yozmang.', 'To‘lov turi mijozga bog‘langan bo‘lsa (masalan «Mijoz to‘lovi»), mijozni tanlash shart.'],
   },
   {
     id: 'drivers',
@@ -163,7 +188,7 @@ export const GUIDE_SECTIONS = [
     actions: [
       'Har bir haydovchi bo‘yicha: shu oy reyslari, ish haqi, to‘langan, qolgan',
       'Avans berish (ish haqidan ayiriladi)',
-      'Oylik stavkasini ko‘rish va o‘zgartirish (payroll.manage)',
+      'Oylik stavkasini ko‘rish va o‘zgartirish',
       'Yangi haydovchi qo‘shish (login va parol bilan)',
       'Reyslarni haydovchi bo‘yicha ko‘rish',
     ],
@@ -190,7 +215,7 @@ export const GUIDE_SECTIONS = [
     ],
     steps: [
       '«Yangi xodim qo‘shish»ni bosing: ism, login, parol (yoki avtomatik), telefon, lavozim.',
-      'Login va parolni xodimga yetkazing — u shu login bilan `karer.erp` domenga kiradi.',
+      'Login va parolni xodimga yetkazing.',
       'Lavozimni «Sozlamalar»da yaratganingizdan keyin shu yerda tanlang.',
     ],
     tips: ['Xodim qo‘shish va parol berish faqat to‘liq huquqli (superadmin) xodimga berilgan.', 'O‘z lavozimingizni yoki holatingizni o‘zgartira olmaysiz — bu bloklanishning oldini oladi.'],
@@ -215,7 +240,7 @@ export const GUIDE_SECTIONS = [
       '«Lavozimlar» tabida lavozim yarating va ruxsatlarni belgilang.',
       'Barcha ruxsatlar berilgan lavozim egasi superadmin deb hisoblanadi.',
     ],
-    tips: ['Lavozimdagi ruxsatlar darhol kuchga kiradi — xodim shu zahoti yangi imkoniyatni oladi.', 'O‘zgartirish uchun `*manage`, faqat qo‘shish uchun `*create` ruxsati kerak.'],
+    tips: ['Lavozimdagi ruxsatlar darhol kuchga kiradi — xodim shu zahoti yangi imkoniyatni oladi.'],
   },
 ]
 
@@ -249,8 +274,9 @@ export const GUIDE_BASICS = [
   {
     title: 'Kunlik tartib',
     items: [
-      'Ertaga har bir samosval uchun «Yangi reys» sahifasidan yukni tasdiqlang.',
+      'Ertaga har bir samosval uchun «Yangi reys» sahifasidan yukni kiriting — reys monitoring navbatiga tushadi.',
       'Moliya kelganda «Moliya» bo‘limidan to‘lov (kirim) va xarajat (chiqim) yozuvlarini kiriting.',
+      '«Monitoring» bo‘limidan reys va xarajatlarni tasdiqlang — shundan keyin ular moliyaviy hisobga kiradi.',
       'Yakunda «Umumiy ko‘rinish» dan tushum, foyda va ochiq nosozliklarni tekshiring.',
     ],
   },
@@ -267,7 +293,9 @@ export const GUIDE_BASICS = [
     items: [
       'Reys qiymati = og‘irlik (tonna) × tosh turi tonna narxi.',
       'Mijoz balansi = boshlang‘ich qarz + hisobga savdolar − to‘langan to‘lovlar.',
-      'Naqd savdo reysi kassaga avtomatik kirim qilinadi.',
+      'Yangi reys va yangi chiqim «Kutilmoqda» bo‘ladi va moliyaviy hisobga KIRMAYDI.',
+      'Tasdiqlangan naqd savdo reysi kassaga avtomatik kirim qilinadi; bekor qilinganda shu kirim o‘chadi.',
+      'Monitoring izohi ixtiyoriy: kim, qachon tasdiqlaganini izohlashingiz mumkin.',
     ],
   },
   {

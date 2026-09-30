@@ -1,6 +1,6 @@
 <script setup>
 import { reactive, ref, computed, watch } from 'vue'
-import { Info, KeyRound, RefreshCw, Eye, EyeOff, Copy, ShieldCheck } from 'lucide-vue-next'
+import { KeyRound, RefreshCw, Eye, EyeOff, Copy, ShieldCheck } from 'lucide-vue-next'
 import FormActions from './FormActions.vue'
 import PhoneField from './PhoneField.vue'
 import { INTERNAL_DOMAIN } from '../../lib/supabase'
@@ -95,28 +95,22 @@ function submit() {
   <form @submit.prevent="submit">
     <div class="grid gap-4 sm:grid-cols-2">
       <label class="sm:col-span-2"><span class="label">Xodimning to‘liq ismi</span><input v-model="form.fullName" class="field" placeholder="Ism Familiya" required /></label>
-      <label v-if="!isEdit" class="sm:col-span-2"><span class="label">Login (tizimga kirish uchun)</span><input v-model="form.login" class="field" placeholder="masalan: ali" autocomplete="off" autocapitalize="none" spellcheck="false" required /><span class="mt-1 block text-[10px] text-muted">Tizimga kirishda shu login yoziladi ({{ loginHint }}). Xodim o‘z loginini email sifatida kiritmaydi.</span></label>
+      <label v-if="!isEdit" class="sm:col-span-2"><span class="label">Login</span><input v-model="form.login" class="field" placeholder="masalan: ali" autocomplete="off" autocapitalize="none" spellcheck="false" required /><span class="mt-1 block text-[10px] text-muted">{{ loginHint }}</span></label>
       <label v-if="!isEdit" class="sm:col-span-2">
         <span class="label">Parol</span>
         <div class="flex gap-2">
           <div class="relative flex-1"><KeyRound :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" /><input v-model="form.password" class="field pl-10" :type="showPassword ? 'text' : 'password'" placeholder="Kamida 8 ta belgi" autocomplete="new-password" minlength="8" maxlength="72" required /><button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-leaf" :aria-label="showPassword ? 'Parolni yashirish' : 'Parolni ko‘rsatish'" @click="showPassword = !showPassword"><EyeOff v-if="showPassword" :size="15" /><Eye v-else :size="15" /></button></div>
           <button type="button" class="btn-secondary shrink-0" title="Tayyor parol yaratish" @click="randomPassword"><RefreshCw :size="14" /> Tayyor</button>
         </div>
-        <span class="mt-1 block text-[10px] text-muted">Xodim shu parol bilan kiradi — uni o‘ziga yetkazing. Kamida 8 ta belgi, katta/kichik harf va raqamlar aralash bo‘lsin.</span>
+        <span class="mt-1 block text-[10px] text-muted">Kamida 8 ta belgi: katta/kichik harf va raqam.</span>
       </label>
       <PhoneField v-model="form.phone" label="Telefon" hint="Xodim bilan bog‘lanish uchun. +998 avtomatik qo‘shiladi." />
       <label><span class="label">Lavozim bo‘limi</span><input v-model="form.title" class="field" :placeholder="selectedRole?.name || 'Masalan: qurilma bo‘limi boshlig‘i'" /></label>
-      <label class="sm:col-span-2"><span class="label">Lavozim (ruxsatlar shundan kelib chiqadi)</span><select v-model="form.roleId" class="field" required :disabled="isSelf"><option value="" disabled>Lavozimni tanlang</option><option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option></select>
-        <span v-if="grantsFullAccess" class="mt-1 flex items-center gap-1 text-[10px] font-semibold text-[#b77824]"><ShieldCheck :size="11" /> Bu lavozim to‘liq huquqli: xodim superadmin bo‘ladi va xodim/lavozim boshqarishiga kiradi.</span>
+      <label class="sm:col-span-2"><span class="label">Lavozim</span><select v-model="form.roleId" class="field" required :disabled="isSelf"><option value="" disabled>Lavozimni tanlang</option><option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option></select>
+        <span v-if="grantsFullAccess" class="mt-1 flex items-center gap-1 text-[10px] font-semibold text-[#b77824]"><ShieldCheck :size="11" /> To‘liq huquqli lavozim (superadmin).</span>
       </label>
       <label v-if="selectedRole?.permissions?.includes('driver.self') || parseAmountInput(form.driverRatePerTrip) > 0" class="sm:col-span-2"><span class="label">Bir reys uchun haq</span><div class="relative"><input :value="form.driverRatePerTrip" type="text" inputmode="numeric" autocomplete="off" class="field pr-16" @input="onRate"><span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">so‘m / reys</span></div></label>
-      <label v-if="isEdit" class="sm:col-span-2"><span class="label">Holati</span><select v-model="form.isActive" class="field" :disabled="isSelf"><option :value="true">Faol — tizimga kirishi mumkin</option><option :value="false">Faol emas — kirish bloklanadi</option></select><span v-if="isSelf" class="mt-1 block text-[10px] text-muted">O‘z hisobingiz holatini o‘zgartirib bo‘lmaydi.</span></label>
-    </div>
-    <div class="mt-4 flex gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-[11px] leading-4 text-blue-800">
-      <Info :size="15" class="mt-0.5 shrink-0" />
-      <span v-if="props.demoMode">Demo rejimida xodim faqat shu brauzer ro‘yxatiga qo‘shiladi; haqiqiy login yaratilmaydi.</span>
-      <span v-else-if="isEdit">Ma’lumotlar saqlanadi. Parolni alohida “Parol” tugmasi orqali yangilashingiz mumkin.</span>
-      <span v-else>Xodim qo‘shilishi bilan login va parol yaratiladi. Parol server tomonda shifrlab saqlanadi, email yoki taklif linki yuborilmaydi. Siz kiritgan parol o‘zgartirilmay saqlanadi.</span>
+      <label v-if="isEdit" class="sm:col-span-2"><span class="label">Holati</span><select v-model="form.isActive" class="field" :disabled="isSelf"><option :value="true">Faol</option><option :value="false">Bloklangan</option></select><span v-if="isSelf" class="mt-1 block text-[10px] text-muted">O‘z hisobingiz holatini o‘zgartirib bo‘lmaydi.</span></label>
     </div>
     <p v-if="error" class="mt-3 text-xs font-semibold text-danger">{{ error }}</p>
     <FormActions :loading="loading" :submit-label="isEdit ? 'Saqlash' : 'Xodim qo‘shish'" @cancel="emit('cancel')" />

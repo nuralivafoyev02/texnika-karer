@@ -680,6 +680,17 @@ button:disabled {
   background: #edf4fa;
 }
 
+/* Monitoring holati: "Kutilmoqda" — e'tibor talab qiladi, "Tasdiqlangan" — yashil. */
+.tag-warn {
+  color: #96621d;
+  background: #fff2d9;
+}
+
+.tag-leaf {
+  color: #0f7a4d;
+  background: #e4f6ec;
+}
+
 /* ── Skeleton placeholder ───────────────────────────────────────────────────
    Ma'lumot kelguncha ko'rsatiladigan "soy" bloklar. Bitta `.skeleton` klassi
    fonini va yugish (shimmer) animatsiyasini beradi, qolgan o'lcham ham Tailwind

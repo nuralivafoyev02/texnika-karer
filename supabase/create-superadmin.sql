@@ -37,6 +37,8 @@ where lower(u.email) = 'karersuperadmin@karer.erp'
   and not exists (select 1 from auth.identities i where i.user_id = u.id);
 
 -- ── 2. ERP profili: Boshliq lavozimi + to'liq huquq ─────────────────────────
+-- 'Boshliq' roli `grants_all = true` bilan seed qilinadi, shuning uchun yangi
+-- ruxsat kalitlari qo'shilsa ham bu profil superadminligini yo'qotmaydi.
 insert into public.users (id, full_name, email, login, title, role_id, is_superadmin, is_active, driver_rate_per_trip, password_changed_at)
 select u.id, 'Superadmin', u.email, 'karersuperadmin', 'Boshliq', r.id, true, true, 0, now()
 from auth.users u
@@ -44,6 +46,12 @@ cross join public.roles r
 where lower(u.email) = 'karersuperadmin@karer.erp' and r.name = 'Boshliq'
 on conflict (id) do update
   set is_superadmin = true, is_active = true, role_id = excluded.role_id, login = excluded.login;
+
+-- Eski bazalarda 'Boshliq' grants_all=false bo'lishi mumkin — kafolat beramiz.
+update public.roles set grants_all = true where name = 'Boshliq';
+insert into public.role_permissions (role_id, permission_id)
+select r.id, p.id from public.roles r cross join public.permissions p where r.name = 'Boshliq'
+on conflict do nothing;
 
 -- ── 3. Tekshiruv ───────────────────────────────────────────────────────────
 select u.login, u.full_name, u.email, u.is_active, u.is_superadmin, r.name as lavozim

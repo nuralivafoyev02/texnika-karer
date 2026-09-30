@@ -7,7 +7,6 @@ import VehicleForm from '../components/forms/VehicleForm.vue'
 import StaffForm from '../components/forms/StaffForm.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { money, number, initials } from '../lib/format'
-import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
 const route = useRoute()
@@ -94,7 +93,7 @@ function openDriverForm() { showDriver.value = true }
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div><h1 class="page-title">Texnikalar</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div>
+      <div><h1 class="page-title">Texnikalar</h1></div>
       <button v-if="canManage" class="btn-primary" @click="openCreate"><Plus :size="16" /> Texnika qo‘shish</button>
     </div>
 
@@ -166,16 +165,16 @@ function openDriverForm() { showDriver.value = true }
       <footer v-if="withoutDriver" class="flex items-center gap-2 border-t border-line px-5 py-3 text-[10px] text-amber"><CircleAlert :size="13" />{{ withoutDriver }} ta faol texnikada haydovchi biriktirilmagan.</footer>
     </section>
 
-    <ModalDialog v-model="showCreate" title="Yangi texnika qo‘shish" description="Raqam, marka va haydovchini kiriting.">
+    <ModalDialog v-model="showCreate" title="Yangi texnika qo‘shish">
       <VehicleForm :drivers="drivers" :initial-driver-id="newDriverId" :can-add-driver="store.canManageStaff" :loading="saving" @submit="create" @add-driver="openDriverForm" @cancel="showCreate = false" />
     </ModalDialog>
-    <ModalDialog :model-value="Boolean(editing)" title="Texnikani tahrirlash" description="Ma’lumot va haydovchini yangilang." @update:model-value="editing = null">
+    <ModalDialog :model-value="Boolean(editing)" title="Texnikani tahrirlash" @update:model-value="editing = null">
       <VehicleForm v-if="editing" :key="`${editing.id}-${editing.driverId || 'none'}`" :drivers="drivers" :initial-driver-id="newDriverId" :user="editing" :can-add-driver="store.canManageStaff" :loading="saving" @submit="save" @add-driver="openDriverForm" @cancel="editing = null" />
     </ModalDialog>
-    <ModalDialog v-model="showDriver" title="Yangi haydovchi qo‘shish" description="Login va parol shu zahotiyoq yaratiladi." width="max-w-2xl">
+    <ModalDialog v-model="showDriver" title="Yangi haydovchi qo‘shish" width="max-w-2xl">
       <StaffForm :roles="store.roles" :initial-role-id="driverRole" :demo-mode="!store.remoteMode" :loading="saving" @submit="createDriver" @cancel="showDriver = false" />
     </ModalDialog>
-    <ModalDialog :model-value="Boolean(credentials)" title="Xodim tizimga tayyor" description="Login va parolni xodimga yetkazing." @update:model-value="credentials = null">
+    <ModalDialog :model-value="Boolean(credentials)" title="Xodim tizimga tayyor" @update:model-value="credentials = null">
       <div class="space-y-4">
         <div class="rounded-2xl border border-mint bg-[#f4f9ff] p-4"><p class="text-[10px] font-bold uppercase tracking-wide text-muted">{{ credentials?.name }}</p><dl class="mt-3 space-y-2 text-sm"><div class="flex items-center justify-between gap-3"><dt class="text-muted">Login</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.login }}</code></dd></div><div class="flex items-center justify-between gap-3"><dt class="text-muted">Parol</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.password }}</code></dd></div></dl></div>
         <div class="flex justify-end gap-2"><button class="btn-secondary" type="button" @click="credentials = null">Yopish</button><button class="btn-primary" type="button" @click="copyCredentials"><Check v-if="copied" :size="15" /><Copy v-else :size="15" />{{ copied ? 'Nusxalandi' : 'Nusxa olish' }}</button></div>

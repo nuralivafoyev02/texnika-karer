@@ -1,11 +1,12 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Plus, Image, Download, Weight, Truck } from 'lucide-vue-next'
+import { Search, Plus, Image, Download, Weight, Truck, Eye } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
+import TripPreviewModal from '../components/TripPreviewModal.vue'
 import { useQuarryStore } from '../stores/quarry'
-import { dateTime, money, number, isToday } from '../lib/format'
-import { sectionShort } from '../lib/guide'
+import { dateOnly, timeOnly, money, number, isToday, displayId } from '../lib/format'
+import { isAutoApproved, isPendingMonitoring, monitoringLabel, monitoringTagClass } from '../lib/monitoring'
 
 const store = useQuarryStore()
 const route = useRoute()
@@ -16,6 +17,7 @@ const saleType = ref('all')
 const selectedPhoto = ref(null)
 const photoLoading = ref(false)
 const photoError = ref('')
+const selectedTrip = ref(null)
 const filteredTrips = computed(() => [...store.trips]
   .filter((trip) => {
     const search = query.value.trim().toLowerCase()
@@ -24,7 +26,10 @@ const filteredTrips = computed(() => [...store.trips]
   })
   .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)))
 const filteredTons = computed(() => filteredTrips.value.reduce((sum, trip) => sum + Number(trip.weightTons), 0))
-const filteredSales = computed(() => filteredTrips.value.reduce((sum, trip) => sum + Number(trip.totalAmount), 0))
+const filteredSales = computed(() => store.canSeePrices
+  ? filteredTrips.value.filter((trip) => !isPendingMonitoring(trip)).reduce((sum, trip) => sum + Number(trip.totalAmount), 0)
+  : null)
+const filteredPending = computed(() => filteredTrips.value.filter(isPendingMonitoring).length)
 async function openPhoto(trip) {
   selectedPhoto.value = trip
   photoError.value = ''
@@ -37,19 +42,25 @@ async function openPhoto(trip) {
     } finally { photoLoading.value = false }
   }
 }
+function openTripPreview(trip) {
+  selectedTrip.value = trip
+}
+function closeTripPreview() {
+  selectedTrip.value = null
+}
 </script>
 
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Weight :size="15" /> Ishlab chiqarish</div><h1 class="page-title">Reyslar jurnali</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div>
+      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Weight :size="15" /> Ishlab chiqarish</div><h1 class="page-title">Reyslar jurnali</h1></div>
       <button v-if="store.can('trips.create')" class="btn-primary" @click="router.push('/scale')"><Plus :size="17" /> Yangi reys kiritish</button>
     </div>
 
     <section class="grid gap-3 sm:grid-cols-3">
       <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-mint text-leaf"><Truck :size="18" /></div><div><p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Ko‘rsatilgan reys</p><p class="mt-1 text-lg font-bold text-ink">{{ filteredTrips.length }} <span class="text-xs font-medium text-muted">ta</span></p></div></div>
       <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#eaf2fa] text-[#4f7595]"><Weight :size="18" /></div><div><p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Jami og‘irlik</p><p class="mt-1 text-lg font-bold text-ink">{{ number(filteredTons, 1) }} <span class="text-xs font-medium text-muted">tonna</span></p></div></div>
-      <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#fff4e3] text-[#b77824]"><Download :size="18" /></div><div><p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Sotuv qiymati</p><p class="mt-1 text-lg font-bold text-ink">{{ money(filteredSales, { short: true }) }}</p></div></div>
+      <div class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#fff4e3] text-[#b77824]"><Download :size="18" /></div><div><p class="text-[10px] font-semibold uppercase tracking-wide text-muted">Reyslar qiymati</p><p class="mt-1 text-lg font-bold text-ink">{{ store.canSeePrices ? money(filteredSales, { short: true }) : 'Ruxsat yo‘q' }}</p><p v-if="store.canSeePrices && filteredPending" class="mt-0.5 text-[10px] text-muted">+{{ filteredPending }} ta reys kutilmoqda</p></div></div>
     </section>
 
     <section class="card overflow-hidden">
@@ -58,27 +69,30 @@ async function openPhoto(trip) {
         <div class="flex flex-wrap items-center gap-2"><select v-model="period" class="field !w-auto !py-2.5"><option value="all">Barcha sanalar</option><option value="today">Faqat bugun</option></select><select v-model="saleType" class="field !w-auto !py-2.5"><option value="all">Barcha savdo</option><option value="credit">Hisobga</option><option value="cash">Naqd savdo</option></select></div>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[870px] border-collapse text-left">
-          <thead><tr class="table-head border-b border-line"><th class="px-5 py-3">Reys / Sana</th><th class="px-4 py-3">Texnika / Haydovchi</th><th class="px-4 py-3">Mijoz</th><th class="px-4 py-3">Tosh turi</th><th class="px-4 py-3">Og‘irlik / vaqt</th><th class="px-4 py-3">Savdo turi</th><th class="px-5 py-3 text-right">Qiymati</th></tr></thead>
+        <table class="w-full min-w-[960px] border-collapse text-left">
+          <thead><tr class="table-head border-b border-line"><th class="px-5 py-3">Sana / Vaqt</th><th class="px-4 py-3">Texnika / Haydovchi</th><th class="px-4 py-3">Mijoz</th><th class="px-4 py-3">Tosh turi</th><th class="px-4 py-3">Og‘irlik / vaqt</th><th class="px-4 py-3">Savdo turi</th><th class="px-4 py-3">Monitoring</th><th class="px-5 py-3 text-right">Qiymati</th></tr></thead>
           <tbody>
-            <tr v-for="trip in filteredTrips" :key="trip.id" class="border-b border-[#f0f2f0] last:border-0 hover:bg-[#fbfcfb]">
-              <td class="px-5 py-3.5"><div class="flex items-center gap-2"><p class="text-xs font-bold text-ink">{{ trip.id }}</p><button v-if="store.hasPhoto(trip)" class="grid h-6 w-6 place-items-center rounded-md bg-mint text-leaf hover:bg-[#dce9ff]" title="Yuk fotosurati" @click="openPhoto(trip)"><Image :size="13" /></button></div><p class="mt-1 text-[10px] text-muted">{{ dateTime(trip.createdAt) }}</p></td>
+            <tr v-for="trip in filteredTrips" :key="trip.id" class="cursor-pointer border-b border-[#f0f2f0] last:border-0 transition hover:bg-[#f7fafd]" title="Batafsil ko‘rish" @click="openTripPreview(trip)">
+              <td class="px-5 py-3.5"><div class="flex items-center gap-2"><p class="text-xs font-bold text-ink">{{ dateOnly(trip.createdAt) }}</p><button v-if="store.hasPhoto(trip)" class="grid h-6 w-6 place-items-center rounded-md bg-mint text-leaf hover:bg-[#dce9ff]" title="Yuk fotosurati" @click.stop="openPhoto(trip)"><Image :size="13" /></button></div><p class="mt-1 text-[10px] text-muted">{{ timeOnly(trip.createdAt) }}</p></td>
               <td class="px-4 py-3.5"><p class="text-xs font-semibold text-ink">{{ store.vehicles.find((v) => v.id === trip.vehicleId)?.plate || '—' }}</p><p class="mt-1 text-[10px] text-muted">{{ store.driverName(trip.driverId) }}</p></td>
               <td class="max-w-[180px] px-4 py-3.5"><p class="truncate text-xs text-ink">{{ store.tripClient(trip) }}</p><p v-if="trip.note" class="mt-1 truncate text-[10px] text-muted" :title="trip.note">{{ trip.note }}</p></td>
               <td class="px-4 py-3.5"><span class="tag tag-blue">{{ store.materialName(trip.materialId) }}</span></td>
               <td class="px-4 py-3.5"><p class="text-xs font-bold text-ink">{{ number(trip.weightTons, 1) }} t</p><p class="mt-1 text-[10px] text-muted">{{ number(trip.hoursWorked, 1) }} soat</p></td>
               <td class="px-4 py-3.5"><span :class="trip.saleType === 'cash' ? 'tag-cash' : 'tag-credit'" class="tag">{{ trip.saleType === 'cash' ? 'Naqd' : 'Hisobga' }}</span></td>
-              <td class="px-5 py-3.5 text-right"><p class="text-xs font-bold text-ink">{{ money(trip.totalAmount, { short: true }) }}</p><p class="mt-1 text-[10px] text-muted">{{ money(trip.unitPrice, { short: true }) }} / t</p></td>
+              <td class="px-4 py-3.5"><span class="tag" :class="monitoringTagClass(trip)">{{ monitoringLabel(trip) }}</span><span v-if="isAutoApproved(trip)" class="tag tag-blue ml-1" title="Avtomatik tasdiqlangan">Avto</span></td>
+              <td class="px-5 py-3.5 text-right"><template v-if="store.canSeePrices"><p class="text-xs font-bold text-ink">{{ money(trip.totalAmount, { short: true }) }}</p><p class="mt-1 text-[10px] text-muted">{{ money(trip.unitPrice, { short: true }) }} / t</p></template><p v-else class="text-[10px] text-muted">Ruxsat yo‘q</p></td>
             </tr>
-            <tr v-if="!filteredTrips.length"><td colspan="7" class="px-6 py-16 text-center"><div class="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-canvas text-muted"><Search :size="19" /></div><p class="text-sm font-semibold text-ink">Reys topilmadi</p><p class="mt-1 text-xs text-muted">Qidiruv yoki filtrlarni o‘zgartirib ko‘ring.</p></td></tr>
+            <tr v-if="!filteredTrips.length"><td colspan="8" class="px-6 py-16 text-center"><div class="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-canvas text-muted"><Search :size="19" /></div><p class="text-sm font-semibold text-ink">Reys topilmadi</p><p class="mt-1 text-xs text-muted">Qidiruv yoki filtrlarni o‘zgartirib ko‘ring.</p></td></tr>
           </tbody>
         </table>
       </div>
       <footer class="flex items-center justify-between border-t border-line px-5 py-3 text-[10px] text-muted"><span>{{ filteredTrips.length }} ta yozuv ko‘rsatildi</span></footer>
     </section>
 
-    <ModalDialog :model-value="Boolean(selectedPhoto)" title="Yuk fotosurati" description="Reysga biriktirilgan tasdiqlovchi surat." width="max-w-2xl" @update:model-value="(value) => { if (!value) selectedPhoto = null }">
-      <div v-if="selectedPhoto" class="space-y-4"><div v-if="photoLoading" class="grid h-[45vh] place-items-center rounded-xl bg-canvas text-xs text-muted">Rasm yuklanmoqda…</div><img v-else-if="selectedPhoto.photoUrl" :src="selectedPhoto.photoUrl" :alt="`Reys ${selectedPhoto.id} yuk surati`" class="max-h-[65vh] w-full rounded-xl object-contain bg-canvas" /><div v-else class="grid h-[30vh] place-items-center rounded-xl bg-canvas px-4 text-center text-xs text-muted">{{ photoError || 'Bu reys uchun rasm biriktirilmagan.' }}</div><div class="flex items-center justify-between text-xs"><span class="font-bold text-ink">{{ selectedPhoto.id }} · {{ store.materialName(selectedPhoto.materialId) }}</span><span class="text-muted">{{ number(selectedPhoto.weightTons, 1) }} t</span></div></div>
+    <TripPreviewModal :model-value="Boolean(selectedTrip)" :trip="selectedTrip" @update:model-value="(value) => { if (!value) closeTripPreview() }" />
+
+    <ModalDialog :model-value="Boolean(selectedPhoto)" title="Yuk fotosurati" width="max-w-2xl" @update:model-value="(value) => { if (!value) selectedPhoto = null }">
+      <div v-if="selectedPhoto" class="space-y-4"><div v-if="photoLoading" class="grid h-[45vh] place-items-center rounded-xl bg-canvas text-xs text-muted">Rasm yuklanmoqda…</div><img v-else-if="selectedPhoto.photoUrl" :src="selectedPhoto.photoUrl" :alt="`Reys ${selectedPhoto.id} yuk surati`" class="max-h-[65vh] w-full rounded-xl object-contain bg-canvas" /><div v-else class="grid h-[30vh] place-items-center rounded-xl bg-canvas px-4 text-center text-xs text-muted">{{ photoError || 'Bu reys uchun rasm biriktirilmagan.' }}</div><div class="flex items-center justify-between text-xs"><span class="font-bold text-ink">{{ displayId(selectedPhoto.id) }} · {{ store.materialName(selectedPhoto.materialId) }}</span><span class="text-muted">{{ number(selectedPhoto.weightTons, 1) }} t</span></div></div>
     </ModalDialog>
   </div>
 </template>

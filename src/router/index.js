@@ -11,6 +11,7 @@ export const router = createRouter({
     { path: '/clients', name: 'clients', component: () => import('../views/ClientsView.vue'), meta: { permission: 'clients.view', title: 'Mijozlar' } },
     { path: '/fleet', name: 'fleet', component: () => import('../views/FleetView.vue'), meta: { permission: 'fleet.view', title: 'Texnikalar' } },
     { path: '/finance', name: 'finance', component: () => import('../views/FinanceView.vue'), meta: { permission: 'finance.view', title: 'Moliya' } },
+    { path: '/monitoring', name: 'monitoring', component: () => import('../views/MonitoringView.vue'), meta: { permissionAny: ['monitoring.view', 'monitoring.approve'], title: 'Monitoring' } },
     { path: '/drivers', name: 'drivers', component: () => import('../views/DriversView.vue'), meta: { permissionAny: ['staff.view', 'driver.self'], title: 'Haydovchilar' } },
     { path: '/staff', name: 'staff', component: () => import('../views/StaffView.vue'), meta: { permission: 'staff.view', title: 'Xodimlar' } },
     { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue'), meta: { permissionAny: ['roles.manage', 'materials.create', 'materials.manage', 'finance.categories.create', 'finance.manage'], title: 'Sozlamalar' } },

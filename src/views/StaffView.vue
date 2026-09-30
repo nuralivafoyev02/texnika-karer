@@ -7,7 +7,6 @@ import StaffForm from '../components/forms/StaffForm.vue'
 import { phoneHref } from '../lib/phone'
 import { useQuarryStore } from '../stores/quarry'
 import { initials, money } from '../lib/format'
-import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
 const route = useRoute()
@@ -62,7 +61,7 @@ async function copyCredentials() {
 
 <template>
   <div class="space-y-6">
-    <div class="flex flex-wrap items-end justify-between gap-4"><div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><UserRoundCog :size="15" /> Jamoa boshqaruvi</div><h1 class="page-title">Xodimlar</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div><button v-if="store.canManageStaff" class="btn-primary" @click="showCreate = true"><UserPlus :size="16" /> Xodim qo‘shish</button></div>
+    <div class="flex flex-wrap items-end justify-between gap-4"><div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><UserRoundCog :size="15" /> Jamoa boshqaruvi</div><h1 class="page-title">Xodimlar</h1></div><button v-if="store.canManageStaff" class="btn-primary" @click="showCreate = true"><UserPlus :size="16" /> Xodim qo‘shish</button></div>
 
     <section class="grid gap-4 sm:grid-cols-3"><article class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-mint text-leaf"><UsersRound :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Jami xodimlar</p><p class="mt-1 text-lg font-bold text-ink">{{ store.users.length }} <span class="text-xs font-medium text-muted">kishi</span></p></div></article><article class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#edf3fa] text-[#4f7595]"><ShieldCheck :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Faol lavozimlar</p><p class="mt-1 text-lg font-bold text-ink">{{ store.roles.length }} <span class="text-xs font-medium text-muted">rol</span></p></div></article><article class="card flex items-center gap-3 p-4"><div class="grid h-10 w-10 place-items-center rounded-xl bg-[#fff4e3] text-[#b77824]"><ArrowUpRight :size="18" /></div><div><p class="text-[10px] font-bold uppercase tracking-wide text-muted">Lavozim biriktirilgan</p><p class="mt-1 text-lg font-bold text-ink">{{ rolesInUse }} <span class="text-xs font-medium text-muted">tur</span></p></div></article></section>
 
@@ -81,9 +80,9 @@ async function copyCredentials() {
       <footer class="border-t border-line px-5 py-3 text-[10px] text-muted">{{ staff.length }} ta xodim</footer>
     </section>
 
-    <ModalDialog v-model="showCreate" title="Yangi xodim qo‘shish" description="Login va parol shu zahotiyoq yaratiladi."><StaffForm :roles="store.roles" :demo-mode="!store.remoteMode" :loading="saving" @submit="create" @cancel="showCreate = false" /></ModalDialog>
-    <ModalDialog :model-value="Boolean(editing)" title="Xodimni tahrirlash" description="Lavozim, aloqa va holatni yangilang." @update:model-value="editing = null"><StaffForm v-if="editing" :roles="store.roles" :user="editing" :demo-mode="!store.remoteMode" :loading="saving" @submit="save" @cancel="editing = null" /></ModalDialog>
-    <ModalDialog :model-value="Boolean(passwordUser)" :title="`Parolni yangilash${passwordUser ? ` — ${passwordUser.fullName}` : ''}`" description="Xodim yangi parol bilan tizimga kiradi." @update:model-value="passwordUser = null">
+    <ModalDialog v-model="showCreate" title="Yangi xodim qo‘shish"><StaffForm :roles="store.roles" :demo-mode="!store.remoteMode" :loading="saving" @submit="create" @cancel="showCreate = false" /></ModalDialog>
+    <ModalDialog :model-value="Boolean(editing)" title="Xodimni tahrirlash" @update:model-value="editing = null"><StaffForm v-if="editing" :roles="store.roles" :user="editing" :demo-mode="!store.remoteMode" :loading="saving" @submit="save" @cancel="editing = null" /></ModalDialog>
+    <ModalDialog :model-value="Boolean(passwordUser)" :title="`Parolni yangilash${passwordUser ? ` — ${passwordUser.fullName}` : ''}`" @update:model-value="passwordUser = null">
       <form @submit.prevent="savePassword">
         <label class="block"><span class="label">Yangi parol</span><div class="relative"><KeyRound :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" /><input v-model="password" class="field pl-10" type="password" autocomplete="new-password" placeholder="Kamida 8 ta belgi" /></div></label>
         <p class="mt-3 rounded-xl bg-canvas p-3 text-[11px] leading-4 text-muted">Parolni xodimga alohida yetkazing — boshqa kishlar bilan bo‘lishmang.</p>
@@ -91,7 +90,7 @@ async function copyCredentials() {
         <div class="mt-4 flex justify-end gap-2"><button type="button" class="btn-secondary" @click="passwordUser = null">Bekor qilish</button><button class="btn-primary" :disabled="saving">{{ saving ? 'Saqlanmoqda…' : 'Parolni yangilash' }}</button></div>
       </form>
     </ModalDialog>
-    <ModalDialog :model-value="Boolean(credentials)" title="Xodim tizimga tayyor" description="Login va parolni xodimga yetkazing." @update:model-value="credentials = null">
+    <ModalDialog :model-value="Boolean(credentials)" title="Xodim tizimga tayyor" @update:model-value="credentials = null">
       <div class="space-y-4">
         <div class="rounded-2xl border border-mint bg-[#f4f9ff] p-4"><p class="text-[10px] font-bold uppercase tracking-wide text-muted">{{ credentials?.name }}</p><dl class="mt-3 space-y-2 text-sm"><div class="flex items-center justify-between gap-3"><dt class="text-muted">Login</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.login }}</code></dd></div><div class="flex items-center justify-between gap-3"><dt class="text-muted">Parol</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.password }}</code></dd></div></dl></div>
         <p class="text-[11px] leading-4 text-muted">Parol faqat shu oynada bir marta ko‘rsatiladi.</p>

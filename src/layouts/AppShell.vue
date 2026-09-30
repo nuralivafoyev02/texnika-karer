@@ -1,12 +1,29 @@
 <script setup>
-import { RouterView } from 'vue-router'
-import { Check, CircleAlert, X } from 'lucide-vue-next'
+import { ref, watch, onErrorCaptured } from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { Check, CircleAlert, X, RefreshCw } from 'lucide-vue-next'
 import AppSidebar from '../components/AppSidebar.vue'
 import AppHeader from '../components/AppHeader.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { supabaseConfigured } from '../lib/supabase'
 
 const store = useQuarryStore()
+const route = useRoute()
+// Xato chegarasi: bitta bo'lim render paytida xato qilsa, butun ilova oq
+// ekranga aylanmasin. Avvalgi holatda bitta noto'g'ri ifoda barcha bo'limlarni
+// "refresh qilmaguncha oq" qilib qo'yardi — endi faqat shu bo'limga xabar
+// ko'rsatiladi, boshqa bo'limga o'tish esa o'zi tiklanadi.
+const viewError = ref('')
+const viewAttempt = ref(0)
+onErrorCaptured((error) => {
+  viewError.value = error?.message || 'Kutilmagan xatolik yuz berdi.'
+  return false
+})
+watch(() => route.name, () => { viewError.value = '' })
+function retryView() {
+  viewError.value = ''
+  viewAttempt.value += 1
+}
 </script>
 
 <template>
@@ -23,16 +40,25 @@ const store = useQuarryStore()
       <main class="content-area">
         <div v-if="!supabaseConfigured" class="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[11px] leading-4 text-red-700">
           <CircleAlert :size="14" class="mt-0.5 shrink-0" />
-          <p class="flex-1"><strong class="font-bold">Supabase ulanmagan — tizim demo rejimida ishlab turibdi.</strong> Loyiha ildizida `.env` faylida <code class="rounded bg-white/70 px-1">VITE_SUPABASE_URL</code> va <code class="rounded bg-white/70 px-1">VITE_SUPABASE_ANON_KEY</code> bo‘lishi kerak (`.env.example` ga emas), so‘ng <code class="rounded bg-white/70 px-1">npm run dev</code> ni qayta ishga tushiring. Barcha kiritilgan ma’lumotlar faqat shu brauzerning xotirasida saqlanadi.</p>
+          <p class="flex-1"><strong class="font-bold">Demo rejim:</strong> ma’lumotlar faqat shu brauzerda saqlanadi.</p>
         </div>
         <div v-if="store.dataWarnings.length" class="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] leading-4 text-amber-800">
           <CircleAlert :size="14" class="mt-0.5 shrink-0" />
-          <p class="flex-1">Quyidagi ma’lumotlar yuklanmadi, ko‘rsatkichlar to‘liq bo‘lmasligi mumkin: {{ store.dataWarnings.join(', ') }}.</p>
+          <p class="flex-1">Yuklanmadi: {{ store.dataWarnings.join(', ') }}.</p>
           <button class="btn-quiet !p-1" aria-label="Ogohlantirishni yopish" @click="store.dataWarnings = []"><X :size="14" /></button>
         </div>
-        <RouterView v-slot="{ Component, route }">
+        <RouterView v-slot="{ Component, route: current }">
           <Transition name="fade" mode="out-in">
-            <component :is="Component" :key="route.name" />
+            <component :is="Component" v-if="!viewError" :key="`${current.name}-${viewAttempt}`" />
+            <div v-else :key="`error-${current.name}`" class="card p-6 text-center">
+              <div class="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-red-50 text-danger"><CircleAlert :size="19" /></div>
+              <h2 class="text-sm font-bold text-ink">Bu bo‘limni ko‘rsatib bo‘lmadi</h2>
+              <p class="mx-auto mt-1 max-w-md text-xs text-muted">{{ viewError }}</p>
+              <div class="mt-4 flex items-center justify-center gap-2">
+                <button class="btn-primary !py-2 text-xs" @click="retryView"><RefreshCw :size="14" /> Qayta urinish</button>
+                <RouterLink to="/dashboard" class="btn-quiet !py-2 text-xs" @click="viewError = ''">Bosh sahifaga</RouterLink>
+              </div>
+            </div>
           </Transition>
         </RouterView>
       </main>

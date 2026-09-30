@@ -147,7 +147,7 @@ async function removeAvatar() {
 </script>
 
 <template>
-  <ModalDialog v-model="open" title="Mening profilim" description="O‘z ma’lumotlaringizni yangilashingiz mumkin." width="max-w-lg">
+  <ModalDialog v-model="open" title="Mening profilim" width="max-w-lg">
     <!-- Profil kartasi: kimligi va rasmni bir qarorda ko'rsatadi. -->
     <div class="flex items-center gap-4 rounded-2xl border border-line bg-canvas/60 p-4">
       <div class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-white text-lg font-bold text-leaf ring-1 ring-line">
@@ -224,7 +224,7 @@ async function removeAvatar() {
             <label v-if="canChangeLogin">
               <span class="label">Login</span>
               <input v-model="login" class="field" autocomplete="username" placeholder="masalan: javlon" />
-              <span class="mt-1 block text-[10px] text-muted">Kichik harflar, raqamlar, nuqta va chiziqcha (3–32 belgi). Login — tizimga kirish nomiz.</span>
+              <span class="mt-1 block text-[10px] text-muted">Kichik harf, raqam, nuqta, chiziqcha (3–32 belgi).</span>
             </label>
             <p v-else-if="!store.remoteMode" class="rounded-xl bg-white px-3 py-2.5 text-[11px] text-muted">Demo rejimida login va parol o‘zgartirilmaydi — bu faqat namoyish uchun.</p>
             <p v-else class="rounded-xl bg-white px-3 py-2.5 text-[11px] text-muted">Bu hisobda login belgilanmagan. Administratorga murojaat qiling.</p>
@@ -239,7 +239,6 @@ async function removeAvatar() {
                 <input v-model="newPassword" class="field pr-20" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" placeholder="Kamida 8 belgi" />
                 <button type="button" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-[10px] font-bold text-leaf" @click="showPassword = !showPassword">{{ showPassword ? 'Yashirish' : 'Ko‘rsatish' }}</button>
               </div>
-              <span class="mt-1 block text-[10px] text-muted">Parolni bo‘sh qoldirmaslik uchun o‘zgartiring. Parol hech qayerda saqlanmaydi.</span>
             </label>
 
             <button

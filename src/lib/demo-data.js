@@ -16,6 +16,8 @@ const accountantKeys = [
 // "Faqat kiritish" namunasi: to'liq boshqaruvsiz, o'z mahsulot/turini yaratadigan xodim.
 const entryKeys = ['dashboard.view', 'trips.view', 'fleet.view', 'materials.create', 'finance.view', 'finance.categories.create']
 const scaleKeys = ['trips.view', 'trips.create', 'fleet.view']
+// Tarozi ustasining kuchaytirilgan varianti: kiritgan reysi monitoringga yubormaydi.
+const scaleAutoKeys = [...scaleKeys, 'trips.auto_approve']
 const driverKeys = ['driver.self', 'maintenance.report']
 
 // Moliya turlari — supabase/schema.sql dagi transaction_categories seedi bilan bir xil.
@@ -32,10 +34,11 @@ const categories = [
 
 export function createDemoData() {
   const roles = [
-    { id: 'role-boss', name: 'Boshliq', description: 'Barcha bo‘limlar va tizim sozlamalari', color: 'green', isSystem: true, permissions: allKeys },
+    { id: 'role-boss', name: 'Boshliq', description: 'Barcha bo‘limlar va tizim sozlamalari', color: 'green', isSystem: true, grantsAll: true, permissions: allKeys },
     { id: 'role-accountant', name: 'Buxgalter', description: 'Moliya, mijozlar va ish haqi hisobi', color: 'blue', isSystem: true, permissions: accountantKeys },
     { id: 'role-entry', name: 'Kirituvchi', description: 'Mahsulot va moliya turlarini kiritadi, boshqarmaydi', color: 'slate', isSystem: false, permissions: entryKeys },
     { id: 'role-scale', name: 'Tarozi ustasi', description: 'Reyslarni ro‘yxatga olish', color: 'amber', isSystem: true, permissions: scaleKeys },
+    { id: 'role-scale-auto', name: 'Tarozi ustasi (avto)', description: 'Reyslarni kiritadi va darhol tasdiqlaydi', color: 'amber', isSystem: false, permissions: scaleAutoKeys },
     { id: 'role-driver', name: 'Haydovchi', description: 'Faqat o‘z ish faoliyati va xabarlari', color: 'slate', isSystem: true, permissions: driverKeys },
   ]
 
@@ -91,6 +94,10 @@ export function createDemoData() {
     { id: 'T-2390', vehicleId: 'v-1', driverId: 'u-driver-1', clientId: 'c-3', materialId: 'm-2', weightTons: 32.3, hoursWorked: 1.5, saleType: 'credit', daysAgo: 7, hour: 13, minute: 47 },
   ]
 
+  // Monitoring demo uchun navbat: bugungi 3 ta reys tasdiqlanmagan — ular moliyaviy
+  // hisobga HALI kirmaydi (kassa, mijoz balansi va dashboard shuni ko'rsatadi).
+  const pendingTripIds = new Set(['T-2404', 'T-2405', 'T-2406'])
+
   const trips = tripSeed.map((item) => {
     const material = materials.find((m) => m.id === item.materialId)
     return {
@@ -109,6 +116,10 @@ export function createDemoData() {
       note: item.note || '',
       createdAt: shiftDate(item.daysAgo, item.hour, item.minute),
       createdBy: 'u-scale',
+      // Monitoring demo holati: oxirgi 3 ta reys navbatda (kutilmoqda), qolgani tasdiqlangan.
+      monitoringStatus: pendingTripIds.has(item.id) ? 'pending' : 'approved',
+      monitoredAt: pendingTripIds.has(item.id) ? null : shiftDate(item.daysAgo, item.hour, item.minute + 20),
+      monitoringNote: '',
     }
   })
 
@@ -125,11 +136,23 @@ export function createDemoData() {
     { id: 'TX-810', direction: 'in', category: 'customer_payment', amount: 5_000_000, paymentMethod: 'cash', clientId: 'c-5', driverId: null, vehicleId: null, note: 'Avans hisobiga', createdAt: shiftDate(4, 12, 25) },
   ]
 
-  trips.filter((trip) => trip.saleType === 'cash').forEach((trip) => {
+  // Monitoring: faqat CHIQIM yozuvlari tasdiqlanadi va faqat ular kutilmoqda bo'ladi.
+  // Kirimlar (TX-801/802/806/810 va naqd savdo) doim tasdiqlangan hisoblanadi.
+  const pendingExpenseIds = new Set(['TX-803', 'TX-805'])
+  transactions.forEach((tx) => {
+    tx.monitoringStatus = tx.direction === 'out' && pendingExpenseIds.has(tx.id) ? 'pending' : 'approved'
+    tx.monitoredAt = tx.monitoringStatus === 'approved' ? tx.createdAt : null
+    tx.monitoringNote = ''
+  })
+
+  // Naqd savdo tushumi faqat TASDIQLANGAN reyslar uchun yoziladi — kutilayotgan
+  // reysning tushumi kassada ko'rinmaydi (DB trigger'i bilan bir xil qoida).
+  trips.filter((trip) => trip.saleType === 'cash' && trip.monitoringStatus === 'approved').forEach((trip) => {
     transactions.push({
       id: `TX-${trip.id}`, direction: 'in', category: 'cash_sale', amount: trip.totalAmount,
       paymentMethod: 'cash', clientId: trip.clientId, driverId: null, vehicleId: trip.vehicleId,
       note: `Naqd savdo · ${trip.id}`, tripId: trip.id, createdAt: trip.createdAt,
+      monitoringStatus: 'approved', monitoredAt: trip.createdAt, monitoringNote: '',
     })
   })
 

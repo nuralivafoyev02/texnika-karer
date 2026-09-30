@@ -8,7 +8,6 @@ import { phoneHref } from '../lib/phone'
 import PaymentForm from '../components/forms/PaymentForm.vue'
 import { useQuarryStore } from '../stores/quarry'
 import { initials, money } from '../lib/format'
-import { sectionShort } from '../lib/guide'
 
 const store = useQuarryStore()
 const route = useRoute()
@@ -41,7 +40,7 @@ function openPayment(clientId = '') { selectedClientId.value = clientId; showPay
 <template>
   <div class="space-y-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><UsersRound :size="15" /> Mijozlar bilan ishlash</div><h1 class="page-title">Mijozlar</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div>
+      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><UsersRound :size="15" /> Mijozlar bilan ishlash</div><h1 class="page-title">Mijozlar</h1></div>
       <div class="flex gap-2"><button v-if="store.can('finance.payments.create')" class="btn-secondary" @click="openPayment()"><CircleDollarSign :size="16" /> To‘lov kiritish</button><button v-if="store.can('clients.manage')" class="btn-primary" @click="showNewClient = true"><Plus :size="17" /> Yangi mijoz</button></div>
     </div>
 
@@ -72,7 +71,7 @@ function openPayment(clientId = '') { selectedClientId.value = clientId; showPay
       <footer class="flex items-center justify-between border-t border-line px-5 py-3 text-[10px] text-muted"><span>{{ clients.length }} ta mijoz</span><span class="hidden sm:block">Yashil — avans · Qizil — mijoz qarzi</span></footer>
     </section>
 
-    <ModalDialog v-model="showNewClient" title="Yangi mijoz qo‘shish" description="Mijoz profili va boshlang‘ich hisob holatini kiriting."><ClientForm :loading="saving" @submit="createClient" @cancel="showNewClient = false" /></ModalDialog>
-    <ModalDialog v-model="showPayment" title="Mijozdan to‘lov qabul qilish" description="Kirim tanlangan to‘lov turiga ko‘ra kassa yoki bankka yoziladi."><PaymentForm :clients="store.clients" :balance-for="store.clientBalance" :initial-client-id="selectedClientId" :loading="saving" @submit="createPayment" @cancel="showPayment = false" /></ModalDialog>
+    <ModalDialog v-model="showNewClient" title="Yangi mijoz qo‘shish"><ClientForm :loading="saving" @submit="createClient" @cancel="showNewClient = false" /></ModalDialog>
+    <ModalDialog v-model="showPayment" title="Mijozdan to‘lov qabul qilish"><PaymentForm :clients="store.clients" :balance-for="store.clientBalance" :initial-client-id="selectedClientId" :loading="saving" @submit="createPayment" @cancel="showPayment = false" /></ModalDialog>
   </div>
 </template>

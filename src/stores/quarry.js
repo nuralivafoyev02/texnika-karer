@@ -1,14 +1,19 @@
 import { defineStore } from 'pinia'
 import { createDemoData } from '../lib/demo-data'
-import { isSameMonth, isToday, localDayKey } from '../lib/format'
+import { isSameMonth, isToday, localDayKey, weekdayShort } from '../lib/format'
+import {
+  affectsFinance as isFinancial, isPendingMonitoring as isPending, monitoringStatus as monitoringStatusOf,
+} from '../lib/monitoring'
 import { formatPhone } from '../lib/phone'
-import { FULL_ACCESS_KEYS, hasFullAccess } from '../lib/permissions'
+import { FULL_ACCESS_KEYS, hasFullAccess, roleGrantsAll } from '../lib/permissions'
 import { supabase, supabaseConfigured, toAuthEmail } from '../lib/supabase'
 
 const STORAGE_KEY = 'qazilma-erp-demo-v1'
 // Remote ma'lumotlarning tezkor nusxasi: ilova birinchi ochilganda va bo'limga o'tganda
 // to'liq yuklashni kutmasin — cache'dan darhol ko'rsatamiz, yangi ma'lumot fon'da keladi.
-const REMOTE_CACHE_PREFIX = 'qazilma-erp-remote-v1:'
+// v2: monitoring holati noto'g'ri ('approved') keshlangan eski nusxalar yo'qolsin —
+// aks holda tuzatishdan keyin ham eski kesh ochilganda reyslar tasdiqlangan ko'rinardi.
+const REMOTE_CACHE_PREFIX = 'qazilma-erp-remote-v2:'
 const REMOTE_CACHE_MAX_AGE = 14 * 24 * 60 * 60 * 1000 // 14 kundan eski nusxa ishlatilmaydi
 const REMOTE_CACHE_FIELDS = ['users', 'roles', 'clients', 'materials', 'vehicles', 'trips', 'transactions', 'maintenanceReports', 'categories']
 const remoteCacheKey = (userId) => `${REMOTE_CACHE_PREFIX}${userId}`
@@ -25,11 +30,39 @@ const writeRemoteCache = (userId, snapshot) => {
   if (!userId || typeof localStorage === 'undefined') return
   try { localStorage.setItem(remoteCacheKey(userId), JSON.stringify(snapshot)) } catch { /* kvota to'lgan bo'lsa — cachesiz ishlayveramiz */ }
 }
+// O'zgarish qiladigan amallar ro'yxati: shular tugagach kesh darhol yangilanadi.
+// Aks holda yangi reys/xarajat kiritilgandan keyin sahifa yangilanganda keshning
+// eski nusxasi ko'rsatiladi — ya'ni "saqlandi, lekin jurnalda yo'q" holati chiqadi.
+const REMOTE_MUTATING_ACTIONS = new Set([
+  'createTrip', 'createPayment', 'createExpense', 'setTripMonitoring', 'setExpenseMonitoring',
+  'createClient', 'createStaff', 'updateStaffProfile', 'setStaffPassword', 'updateMyProfile',
+  'saveRole', 'deleteRole', 'createMaterial', 'updateMaterial', 'deleteMaterial',
+  'createCategory', 'updateCategory', 'deleteCategory', 'createVehicle', 'updateVehicle',
+  'updateVehicleStatus', 'updateDriverRate', 'createMaintenanceReport', 'resolveMaintenanceReport',
+  'removeAvatar', 'uploadAvatar', 'deleteUser', 'updateUser',
+])
 const clearRemoteCache = (userId) => {
   if (!userId || typeof localStorage === 'undefined') return
   try { localStorage.removeItem(remoteCacheKey(userId)) } catch { /* o'chirib bo'lmasa ham asosiy oqim buzilmaydi */ }
 }
 const makeId = (prefix = 'ID') => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 11)}`
+// UUID v4 — `crypto.randomUUID()` faqat XAVFSIZ KONTEKSTDA (https yoki localhost)
+// mavjud. Ilova ichki tarmoq IP si yoki http manzil orqali ochilsa u `undefined`
+// bo'ladi va "globalThis.crypto.randomUUID is not a function" xatosi chiqadi.
+// `getRandomValues` esa barcha kontekstlarda ishlaydi, shuning uchun zaxira
+// variant kriptografik to'g'ri UUID qaytaradi (oxirgisi faqat juda eski
+// brauzerlar uchun).
+const newUuid = () => {
+  const webCrypto = globalThis.crypto
+  if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID()
+  const bytes = new Uint8Array(16)
+  if (typeof webCrypto?.getRandomValues === 'function') webCrypto.getRandomValues(bytes)
+  else for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
 const roleMap = (roleId, roles) => roles.find((role) => role.id === roleId)
 // The server rounds a trip total with numeric round(x, 2); mirror it so the preview matches.
 const round2 = (value) => Math.round(Number(value) * 100) / 100
@@ -87,6 +120,9 @@ const invokeStaffFunction = async (name, body) => {
   return data
 }
 
+// Monitoring qoidalari `src/lib/monitoring.js` da: faqat 'pending' kutilmoqda degani
+// ma'no beradi, `undefined` (eski sxema / eski demo nusxasi) tasdiqlangan deb olinadi.
+
 const mapUser = (row) => ({
   id: row.id,
   fullName: row.full_name,
@@ -116,12 +152,16 @@ const mapTrip = (row) => ({
   totalAmount: Number(row.total_amount ?? 0), saleType: row.sale_type ?? 'credit',
   hoursWorked: Number(row.hours_worked ?? 0), photoPath: row.photo_path ?? '', photoUrl: '',
   photoName: '', note: row.note ?? '', createdAt: row.created_at, createdBy: row.created_by,
+  monitoringStatus: monitoringStatusOf(row), monitoredAt: row.monitored_at ?? null,
+  monitoringNote: row.monitoring_note ?? '', monitoredBy: row.monitored_by ?? null,
 })
 const mapTransaction = (row) => ({
   id: row.id, direction: row.direction, category: row.category, amount: Number(row.amount ?? 0),
   paymentMethod: row.payment_method ?? 'cash', clientId: row.client_id ?? null,
   driverId: row.driver_id ?? null, vehicleId: row.vehicle_id ?? null, tripId: row.trip_id ?? null,
   note: row.note ?? '', createdAt: row.created_at,
+  monitoringStatus: monitoringStatusOf(row), monitoredAt: row.monitored_at ?? null,
+  monitoringNote: row.monitoring_note ?? '', monitoredBy: row.monitored_by ?? null,
 })
 const mapReport = (row) => ({
   id: row.id, vehicleId: row.vehicle_id, driverId: row.driver_id, description: row.description,
@@ -185,6 +225,11 @@ export const useQuarryStore = defineStore('quarry', {
       toast: null,
       toastTimer: null,
       realtimeChannel: null,
+      // null = tekshirilmagan, true = monitoring ustunlari/RPC'lar bor, false = eski sxema.
+      monitoringSchema: null,
+      cacheSyncReady: false,
+      lastVisibleRefreshAt: 0,
+      visibilityRefreshReady: false,
     }
   },
   getters: {
@@ -223,9 +268,43 @@ export const useQuarryStore = defineStore('quarry', {
     canCreateCategory() {
       return this.can('finance.manage') || this.can('finance.categories.create')
     },
+    // trips.create — kiritish, monitoringga yuboriladi. trips.auto_approve — kiritilgan
+    // reys darhol tasdiqlangan bo'lib saqlanadi (serverdagi prepare_trip shuni belgilaydi).
+    canAutoApproveTrips() {
+      return this.can('trips.auto_approve')
+    },
+    // Monitoringni ko'rish: tasdiqlash huquqi bo'lsa ko'rish ham ochiq (server ham shunday).
+    canViewMonitoring() {
+      return this.can('monitoring.view') || this.can('monitoring.approve')
+    },
+    // Reys va xarajatlarni tasdiqlash / tasdiqlashni bekor qilish.
+    canApproveMonitoring() {
+      return this.can('monitoring.approve')
+    },
+    // Narx (tonna narxi, reys qiymati) ko'rinishi: materials.prices.view yoki moliyani
+    // ko'rish huquqi. Haydovchi va tarozi ustasi bu ikkalasiga ham ega emas — ular faqat
+    // og'irlik, tosh turi va texnikani ko'radi. finance.view egalari (masalan buxgalter)
+    // o'z moliyasini to'liq ko'rishini davom ettiradi.
+    canSeePrices() {
+      return this.can('materials.prices.view') || this.can('finance.view')
+    },
+    // Monitoring navbatidagi yozuvlar — Monitoring bo'limi uchun.
+    pendingTrips(state) {
+      return state.trips.filter(isPending).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    },
+    // Monitoring faqat CHIQIM yozuvlarini nazorat qiladi; kirimlar (to'lov, naqd savdo)
+    // darhol hisobga olinadi.
+    pendingExpenses(state) {
+      return state.transactions.filter((tx) => tx.direction === 'out' && isPending(tx))
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    },
+    pendingMonitoringCount() {
+      return this.pendingTrips.length + this.pendingExpenses.length
+    },
     homeRoute() {
       if (this.can('dashboard.view')) return { name: 'dashboard' }
       if (this.can('driver.self')) return { name: 'drivers' }
+      if (this.can('monitoring.view') || this.can('monitoring.approve')) return { name: 'monitoring' }
       if (this.can('trips.create')) return { name: 'scale' }
       if (this.can('trips.view')) return { name: 'trips' }
       return { name: 'no-access' }
@@ -233,31 +312,40 @@ export const useQuarryStore = defineStore('quarry', {
     todayTrips(state) {
       return state.trips.filter((trip) => isToday(trip.createdAt))
     },
+    // ── Moliyaviy ko'rsatkichlar ────────────────────────────────────────────
+    // Barchasi FAQAT monitoringdan o'tgan (tasdiqlangan) yozuvlarni hisobga oladi:
+    // kutilayotgan reys savdoqiymatiga, kutilayotgan chiqim kassaga kiradi deb
+    // ko'rsatilmasligi kerak. Tayinlash (ogrirlik, reys soni) esa operatsion
+    // ko'rsatkich — u har doim to'liq hisoblanadi.
     todayTonnage() {
       return this.todayTrips.reduce((sum, trip) => sum + Number(trip.weightTons || 0), 0)
     },
     todaySales() {
-      return this.todayTrips.reduce((sum, trip) => sum + Number(trip.totalAmount || 0), 0)
+      return this.todayTrips.filter(isFinancial).reduce((sum, trip) => sum + Number(trip.totalAmount || 0), 0)
+    },
+    // Bugungi "kutilmoqda" reyslari — dashboard uchun ogohlantirish.
+    todayPendingTrips(state) {
+      return state.trips.filter((trip) => isToday(trip.createdAt) && isPending(trip)).length
     },
     todayCashIn(state) {
-      return state.transactions.filter((tx) => tx.direction === 'in' && isToday(tx.createdAt)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
+      return state.transactions.filter((tx) => tx.direction === 'in' && isToday(tx.createdAt) && isFinancial(tx)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
     },
     todayExpenses(state) {
-      return state.transactions.filter((tx) => tx.direction === 'out' && isToday(tx.createdAt)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
+      return state.transactions.filter((tx) => tx.direction === 'out' && isToday(tx.createdAt) && isFinancial(tx)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
     },
     todayProfit() {
       return this.todaySales - this.todayExpenses
     },
     cashBalance(state) {
-      if (!state.remoteMode) return state.transactions.filter((tx) => tx.paymentMethod === 'cash').reduce((sum, tx) => sum + (tx.direction === 'in' ? 1 : -1) * Number(tx.amount || 0), 0)
+      if (!state.remoteMode) return state.transactions.filter((tx) => tx.paymentMethod === 'cash' && isFinancial(tx)).reduce((sum, tx) => sum + (tx.direction === 'in' ? 1 : -1) * Number(tx.amount || 0), 0)
       return state.remoteFinancialBalances.cash
     },
     bankBalance(state) {
-      if (!state.remoteMode) return state.transactions.filter((tx) => tx.paymentMethod === 'bank').reduce((sum, tx) => sum + (tx.direction === 'in' ? 1 : -1) * Number(tx.amount || 0), 0)
+      if (!state.remoteMode) return state.transactions.filter((tx) => tx.paymentMethod === 'bank' && isFinancial(tx)).reduce((sum, tx) => sum + (tx.direction === 'in' ? 1 : -1) * Number(tx.amount || 0), 0)
       return state.remoteFinancialBalances.bank
     },
     monthExpenses(state) {
-      return state.transactions.filter((tx) => tx.direction === 'out' && isSameMonth(tx.createdAt)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
+      return state.transactions.filter((tx) => tx.direction === 'out' && isSameMonth(tx.createdAt) && isFinancial(tx)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
     },
     monthTrips(state) {
       return state.trips.filter((trip) => isSameMonth(trip.createdAt))
@@ -272,11 +360,11 @@ export const useQuarryStore = defineStore('quarry', {
         day.setDate(day.getDate() - offset)
         const key = localDayKey(day)
         const trips = state.trips.filter((trip) => localDayKey(trip.createdAt) === key)
-        const expenses = state.transactions.filter((tx) => tx.direction === 'out' && localDayKey(tx.createdAt) === key)
+        const expenses = state.transactions.filter((tx) => tx.direction === 'out' && localDayKey(tx.createdAt) === key && isFinancial(tx))
         days.push({
           key,
-          label: new Intl.DateTimeFormat('uz-UZ', { weekday: 'short' }).format(day).replace('.', ''),
-          sales: trips.reduce((sum, trip) => sum + Number(trip.totalAmount || 0), 0),
+          label: weekdayShort(day),
+          sales: trips.filter(isFinancial).reduce((sum, trip) => sum + Number(trip.totalAmount || 0), 0),
           expenses: expenses.reduce((sum, tx) => sum + Number(tx.amount || 0), 0),
           tons: trips.reduce((sum, trip) => sum + Number(trip.weightTons || 0), 0),
         })
@@ -307,11 +395,14 @@ export const useQuarryStore = defineStore('quarry', {
       if (!this.currentUser || !this.currentRole || !this.currentUser.isActive) return false
       return this.currentRole.permissions?.includes(permission) ?? false
     },
-    // To'liq dostub — lavozim katalogdagi barcha ruxsatlarni qamrab olgan bo'lsa, xodim
-    // superadmin deb hisoblanadi. DB (is_superadmin) ustuni ham shu qoidani trigger orqali
-    // saqlaydi, lekin UI uchun role.permissions dan hisoblash tez va har doim dolzarb.
+    // To'liq dostub — lavozim katalogdagi barcha ruxsatlarni qamrab olgan bo'lsa YOKI
+    // serverdagi grants_all belgisi qo'yilgan bo'lsa, xodim superadmin deb hisoblanadi.
+    // DB (is_superadmin) ustuni ham shu qoidani trigger orqali saqlaydi, lekin UI uchun
+    // role.permissions + role.grantsAll dan hisoblash tez va har doim dolzarb.
     roleHasFullAccess(roleId) {
-      return hasFullAccess(roleMap(roleId, this.roles)?.permissions, this.fullAccessKeys)
+      const role = roleMap(roleId, this.roles)
+      if (!role) return false
+      return roleGrantsAll(role) || hasFullAccess(role.permissions, this.fullAccessKeys)
     },
     isSuperadmin(user = this.currentUser) {
       if (!user || user.isActive === false) return false
@@ -322,7 +413,9 @@ export const useQuarryStore = defineStore('quarry', {
       return roleMap(user?.roleId, this.roles)?.name ?? 'Lavozim belgilanmagan'
     },
     userCan(user, permission) {
-      return roleMap(user?.roleId, this.roles)?.permissions?.includes(permission) ?? false
+      const role = roleMap(user?.roleId, this.roles)
+      if (roleGrantsAll(role)) return true
+      return role?.permissions?.includes(permission) ?? false
     },
     clientName(id) {
       if (!id) return '—'
@@ -356,20 +449,25 @@ export const useQuarryStore = defineStore('quarry', {
       if (this.remoteMode && Object.prototype.hasOwnProperty.call(this.remoteClientBalances, clientId)) return Number(this.remoteClientBalances[clientId])
       const client = this.clients.find((item) => item.id === clientId)
       if (!client) return 0
-      const billed = this.trips.filter((trip) => trip.clientId === clientId && trip.saleType === 'credit').reduce((sum, trip) => sum + Number(trip.totalAmount || 0), 0)
+      // Faqat tasdiqlangan (qarzga) reyslar balansga yoziladi — serverdagi
+      // client_balances view'i bilan bir xil qoida.
+      const billed = this.trips.filter((trip) => trip.clientId === clientId && trip.saleType === 'credit' && isFinancial(trip)).reduce((sum, trip) => sum + Number(trip.totalAmount || 0), 0)
       const paid = this.transactions.filter((tx) => tx.clientId === clientId && tx.direction === 'in' && tx.category === 'customer_payment').reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
       return Number(client.openingBalance || 0) + billed - paid
     },
     balanceForDriver(driverId) {
       const user = this.users.find((item) => item.id === driverId)
       const trips = this.trips.filter((trip) => trip.driverId === driverId && isSameMonth(trip.createdAt))
-      const earned = trips.length * Number(user?.driverRatePerTrip || 0)
-      const paid = this.transactions.filter((tx) => tx.driverId === driverId && tx.category === 'payroll' && isSameMonth(tx.createdAt)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
-      return { trips: trips.length, earned, paid, remaining: earned - paid }
+      // Ish haqi — moliyaviy ko'rsatkich: faqat tasdiqlangan reyslar uchun to'lanadi,
+      // avans (payroll) esa faqat tasdiqlangan bo'lgani hisobga olinadi.
+      const approved = trips.filter(isFinancial)
+      const earned = approved.length * Number(user?.driverRatePerTrip || 0)
+      const paid = this.transactions.filter((tx) => tx.driverId === driverId && tx.category === 'payroll' && isSameMonth(tx.createdAt) && isFinancial(tx)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
+      return { trips: approved.length, pending: trips.length - approved.length, earned, paid, remaining: earned - paid }
     },
     vehicleStats(vehicleId) {
       const trips = this.trips.filter((trip) => trip.vehicleId === vehicleId && isSameMonth(trip.createdAt))
-      const spent = this.transactions.filter((tx) => tx.vehicleId === vehicleId && tx.direction === 'out').reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
+      const spent = this.transactions.filter((tx) => tx.vehicleId === vehicleId && tx.direction === 'out' && isFinancial(tx)).reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
       return {
         trips: trips.length,
         hours: trips.reduce((sum, trip) => sum + Number(trip.hoursWorked || 0), 0),
@@ -384,7 +482,7 @@ export const useQuarryStore = defineStore('quarry', {
         return existing
       }
       this.trips.unshift(trip)
-      if (trip.saleType === 'credit' && trip.clientId && Object.prototype.hasOwnProperty.call(this.remoteClientBalances, trip.clientId)) {
+      if (trip.saleType === 'credit' && isFinancial(trip) && trip.clientId && Object.prototype.hasOwnProperty.call(this.remoteClientBalances, trip.clientId)) {
         this.remoteClientBalances[trip.clientId] += Number(trip.totalAmount || 0)
       }
       return trip
@@ -394,13 +492,36 @@ export const useQuarryStore = defineStore('quarry', {
       if (existing) return existing
       this.transactions.unshift(transaction)
       const method = transaction.paymentMethod
-      if (this.remoteFinancialBalances[method] !== null && this.remoteFinancialBalances[method] !== undefined) {
+      if (isFinancial(transaction) && this.remoteFinancialBalances[method] !== null && this.remoteFinancialBalances[method] !== undefined) {
         this.remoteFinancialBalances[method] += (transaction.direction === 'in' ? 1 : -1) * Number(transaction.amount || 0)
       }
       if (transaction.category === 'customer_payment' && transaction.clientId && Object.prototype.hasOwnProperty.call(this.remoteClientBalances, transaction.clientId)) {
         this.remoteClientBalances[transaction.clientId] -= Number(transaction.amount || 0)
       }
       return transaction
+    },
+    // Monitoring holati o'zgarganda balanslar ham o'zgaradi (reys tasdiqlanganda mijoz
+    // balansiga yoziladi, bekor qilinganda yozuv qaytariladi; xarajada kassa o'zgaradi).
+    // Ularni qo'lda +/- qilish o'rniga serverdagi ikki view'ni qayta o'qiymiz — shunda
+    // hisob-kitob hech qachon jamoaviy summadan ajralib qolmaydi.
+    async refreshLedgerBalances() {
+      if (!this.remoteMode) return
+      const permissions = this.currentRole?.permissions ?? []
+      const wantsClients = permissions.includes('clients.view') || permissions.includes('clients.manage') || permissions.includes('dashboard.view')
+      const wantsCash = permissions.includes('finance.view') || permissions.includes('dashboard.view')
+      if (!wantsClients && !wantsCash) return
+      const [balances, totals] = await Promise.all([
+        wantsClients ? supabase.from('client_balances').select('client_id,current_balance') : Promise.resolve({ data: null }),
+        wantsCash ? supabase.from('financial_balances').select('payment_method,current_balance') : Promise.resolve({ data: null }),
+      ])
+      if (balances.data) this.remoteClientBalances = Object.fromEntries(balances.data.map((row) => [row.client_id, Number(row.current_balance || 0)]))
+      if (totals.data) {
+        this.remoteFinancialBalances = { cash: null, bank: null }
+        for (const row of totals.data) {
+          if (row.payment_method === 'cash' || row.payment_method === 'bank') this.remoteFinancialBalances[row.payment_method] = Number(row.current_balance || 0)
+        }
+      }
+      this.saveRemoteCache()
     },
     persistDemo() {
       if (this.remoteMode || typeof localStorage === 'undefined') return
@@ -411,6 +532,9 @@ export const useQuarryStore = defineStore('quarry', {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)) } catch { /* demo keeps running if browser storage is full */ }
     },
     notify(message, type = 'success') {
+      // Xatolar toast'da ko'rinadi, lekin console'da yozilmaganda sababni
+      // topish qiyin bo'lardi. Shuning uchun har bir xato console'ga ham tushadi.
+      if (type === 'error') console.error('[ERP]', message)
       this.toast = { id: Date.now(), message, type }
       if (this.toastTimer) clearTimeout(this.toastTimer)
       this.toastTimer = setTimeout(() => { this.toast = null }, 3600)
@@ -472,6 +596,49 @@ export const useQuarryStore = defineStore('quarry', {
         .catch((error) => console.warn('Fon yangilash amalga oshmadi:', error?.message))
         .finally(() => { this.refreshing = false })
     },
+    // Keshga yozish bitta markazda: o'zgarish qilgan har bir amal tugagach
+    // localStorage nusxasi serverdagi holatga tenglanadi. Aks holda "Reys saqlandi"
+    // xabari chiqib, keyingi ochilishda eski jurnalda yo'q bo'lib qoladi.
+    registerRemoteCacheSync() {
+      if (this.cacheSyncReady) return
+      this.cacheSyncReady = true
+      this.$onAction(({ name, after, onError }) => {
+        if (!REMOTE_MUTATING_ACTIONS.has(name)) return
+        const sync = () => { this.saveRemoteCache() }
+        after(sync)
+        onError(sync)
+      })
+    },
+    // Ikkinchi oyna/inkognito'da yozilgan ma'lumot ko'rinmasligi uchun tabga
+    // qaytishda fon yangilanishini ishga tushiramiz (tez-tez ping-pong bo'lmasin).
+    startVisibilityRefresh() {
+      if (typeof document === 'undefined' || this.visibilityRefreshReady) return
+      this.visibilityRefreshReady = true
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || !this.remoteMode) return
+        if (Date.now() - this.lastVisibleRefreshAt < 45_000) return
+        this.lastVisibleRefreshAt = Date.now()
+        this.refreshInBackground()
+      })
+    },
+    // Monitoring sxemasi bazasida bor-yo'qligini tekshiradi. Eski bazada
+    // `monitoring_status` ustuni bo'lmasa, reyslar "tasdiqlangan" deb o'qiladi
+    // va Monitoring sahifasi "kutilmoqda reyslar yo'q" deb jim qoladi — shuning
+    // uchun bu holatni foydalanuvchiga ko'rsatib beramiz.
+    async checkMonitoringSchema(force = false) {
+      if (!this.remoteMode) { this.monitoringSchema = true; return true }
+      if (this.monitoringSchema !== null && !force) return this.monitoringSchema
+      const { error } = await supabase.from('trips').select('monitoring_status').limit(1)
+      if (!error) { this.monitoringSchema = true; return true }
+      const message = String(error.message ?? '')
+      if (/column .* does not exist|schema cache|42703|PGRST204/i.test(message)) {
+        this.monitoringSchema = false
+        return false
+      }
+      // RLS yoki tarmoq xatosi — sxema haqida xulosa chiqarmaymiz.
+      this.monitoringSchema = null
+      return null
+    },
     async initialize() {
       if (!this.remoteMode) {
         this.ready = true
@@ -484,6 +651,8 @@ export const useQuarryStore = defineStore('quarry', {
       }
       this.loading = true
       try {
+        this.registerRemoteCacheSync()
+        this.startVisibilityRefresh()
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) throw error
         this.session = session
@@ -668,7 +837,7 @@ export const useQuarryStore = defineStore('quarry', {
         // Profil, lavozim va ruxsatlar bir vaqtda olinadi: 3 ta ketma-ket to'lqin o'rniga 1 ta.
         const [profileResult, rolesResult, permissionsResult, rolePermissionsResult] = await Promise.all([
           supabase.from('users').select('*').eq('id', this.session.user.id).single(),
-          supabase.from('roles').select('id,name,description,is_system'),
+          supabase.from('roles').select('id,name,description,is_system,grants_all'),
           supabase.from('permissions').select('id,key,label,group_name,description'),
           supabase.from('role_permissions').select('role_id,permission_id'),
         ])
@@ -688,6 +857,9 @@ export const useQuarryStore = defineStore('quarry', {
         }
         this.roles = (rolesResult.data ?? []).map((role) => ({
           id: role.id, name: role.name, description: role.description ?? '', isSystem: role.is_system,
+          // grants_all — serverdagi "barcha ruxsatlar avtomatik" belgisi. UI ham shu
+          // qoidani qo'llaydi, aks holda server to'liq huquqni ko'rsatsa, menyu yopilib qolardi.
+          grantsAll: role.grants_all === true,
           permissions: assigned.get(role.id) ?? [],
         }))
         this.users = [mapUser(profile)]
@@ -706,8 +878,8 @@ export const useQuarryStore = defineStore('quarry', {
 
         const needsClients = can('clients.view') || can('clients.manage') || can('trips.create') || can('dashboard.view')
         const needsVehicles = can('fleet.view') || can('fleet.manage') || can('trips.create') || can('driver.self') || can('dashboard.view')
-        const needsTrips = can('trips.view') || can('trips.create') || can('clients.view') || can('clients.manage') || can('driver.self') || can('dashboard.view')
-        const needsTransactions = can('finance.view') || can('clients.view') || can('clients.manage') || can('driver.self') || can('dashboard.view')
+        const needsTrips = can('trips.view') || can('trips.create') || can('clients.view') || can('clients.manage') || can('driver.self') || can('dashboard.view') || can('monitoring.view') || can('monitoring.approve')
+        const needsTransactions = can('finance.view') || can('clients.view') || can('clients.manage') || can('driver.self') || can('dashboard.view') || can('monitoring.view') || can('monitoring.approve')
         const needsReports = can('dashboard.view') || can('finance.view') || can('fleet.manage') || can('driver.self')
         const needsClientBalances = can('clients.view') || can('clients.manage') || can('dashboard.view')
         const needsFinancialTotals = can('finance.view') || can('dashboard.view')
@@ -718,12 +890,14 @@ export const useQuarryStore = defineStore('quarry', {
           getRows('mahsulotlar', supabase.from('materials').select('*').order('name')),
           needsTrips ? (() => {
             let q = supabase.from('trips').select('*').order('created_at', { ascending: false }).limit(500)
-            if (can('driver.self') && !can('trips.view')) q = q.eq('driver_id', profile.id)
+            // Haydovchi o'ziga tegishli reyslarni ko'radi: ham o'z driver_id si, ham
+            // o'zi kiritgan reyslar (boshqa haydovchining texnikasi orqali bo'lsa ham).
+            if (can('driver.self') && !can('trips.view')) q = q.or(`driver_id.eq.${profile.id},created_by.eq.${profile.id}`)
             return getRows('reyslar', q)
           })() : Promise.resolve([]),
           needsTransactions ? (() => {
             let q = supabase.from('transactions').select('*').order('created_at', { ascending: false }).limit(700)
-            if (can('driver.self') && !can('finance.view')) q = q.eq('driver_id', profile.id)
+            if (can('driver.self') && !can('finance.view')) q = q.or(`driver_id.eq.${profile.id},created_by.eq.${profile.id}`)
             return getRows('moliya', q)
           })() : Promise.resolve([]),
           needsReports ? (() => {
@@ -768,14 +942,32 @@ export const useQuarryStore = defineStore('quarry', {
             const existing = this.maintenanceReports.find((item) => item.id === report.id)
             if (existing) Object.assign(existing, report)
           })
-        if (can('finance.view') || can('dashboard.view') || can('clients.view') || can('finance.payments.create') || can('finance.expenses.create')) {
+        if (can('finance.view') || can('dashboard.view') || can('clients.view') || can('finance.payments.create') || can('finance.expenses.create') || can('monitoring.view') || can('monitoring.approve')) {
           channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions' }, (payload) => {
             this.ingestRemoteTransaction(mapTransaction(payload.new))
           })
+          // Monitoring tasdiqlash/bekor qilish — boshqa qurilmada bo'lganda ham
+          // jadval darhol yangilanadi (balanslar ham qayta o'qiladi).
+          channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions' }, (payload) => {
+            const existing = this.transactions.find((item) => item.id === payload.new.id)
+            if (!existing) return
+            const wasPending = isPending(existing)
+            Object.assign(existing, mapTransaction(payload.new))
+            if (wasPending !== isPending(existing)) this.refreshLedgerBalances()
+          })
         }
-        if (can('trips.view') || can('trips.create') || can('clients.view') || can('dashboard.view') || can('driver.self')) {
+        if (can('trips.view') || can('trips.create') || can('clients.view') || can('dashboard.view') || can('driver.self') || can('monitoring.view') || can('monitoring.approve')) {
           channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trips' }, (payload) => {
             this.ingestRemoteTrip(mapTrip(payload.new))
+          })
+          channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'trips' }, (payload) => {
+            const existing = this.trips.find((item) => item.id === payload.new.id)
+            if (!existing) return
+            const wasPending = isPending(existing)
+            Object.assign(existing, mapTrip(payload.new))
+            // Foto biriktirilganda ham, monitoring holati o'zgarganda ham UPDATE keladi;
+            // balans faqat monitoring o'zgarishida qayta o'qiladi.
+            if (wasPending !== isPending(existing)) this.refreshLedgerBalances()
           })
         }
         if (can('fleet.view') || can('fleet.manage') || can('dashboard.view') || can('driver.self')) {
@@ -816,15 +1008,17 @@ export const useQuarryStore = defineStore('quarry', {
       // (balansga esa qarz yozilmaydi — client_balances faqat credit reyslarni hisoblaydi).
       const clientId = payload.clientId || null
       const note = payload.note?.trim() || ''
-      const id = this.remoteMode ? globalThis.crypto.randomUUID() : makeId('T')
+      const id = this.remoteMode ? newUuid() : makeId('T')
       const createdAt = new Date().toISOString()
       const total = round2(weight * Number(material.unitPrice))
       if (this.remoteMode) {
+        // unit_price va total_amount serverda trigger hisoblaydi, monitoring_status esa
+        // monitoringdan tasdiqlanadi — shuning uchun ularni yubormaymiz (grant ham yo'q).
         const row = {
           id, vehicle_id: vehicle.id, driver_id: vehicle.driverId,
           client_id: clientId,
-          material_id: material.id, weight_tons: weight, unit_price: material.unitPrice,
-          total_amount: total, sale_type: payload.saleType, hours_worked: Number(payload.hoursWorked || 0),
+          material_id: material.id, weight_tons: weight,
+          sale_type: payload.saleType, hours_worked: Number(payload.hoursWorked || 0),
           note: note || null,
           created_by: this.session.user.id,
         }
@@ -855,21 +1049,28 @@ export const useQuarryStore = defineStore('quarry', {
           trip.photoUrl = signed?.signedUrl ?? ''
         }
         const savedTrip = this.ingestRemoteTrip(trip)
-        this.notify('Yangi reys muvaffaqiyatli saqlandi.')
+        this.notify(savedTrip.monitoringStatus === 'approved'
+          ? 'Reys saqlandi va darhol tasdiqlangan — balansga yozildi.'
+          : 'Reys saqlandi va monitoringga yuborildi — tasdiqlashdan keyin balansga yoziladi.')
         return savedTrip
       }
       const trip = {
         id, vehicleId: vehicle.id, driverId: vehicle.driverId, clientId,
         materialId: material.id, weightTons: weight, unitPrice: material.unitPrice, totalAmount: total,
         saleType: payload.saleType, hoursWorked: Number(payload.hoursWorked || 0), photoUrl: await readDataUrl(payload.photoFile),
-        photoName: payload.photoFile?.name ?? '', note, createdAt, createdBy: this.activeUserId,
+        photoName: payload.photoFile?.name ?? '', note, createdBy: this.activeUserId,
+        monitoringStatus: this.canAutoApproveTrips ? 'approved' : 'pending',
+        monitoredAt: this.canAutoApproveTrips ? createdAt : null, monitoredNote: '',
       }
       this.trips.unshift(trip)
-      if (trip.saleType === 'cash') {
-        this.transactions.unshift({ id: makeId('TX'), direction: 'in', category: 'cash_sale', amount: total, paymentMethod: 'cash', clientId, driverId: null, vehicleId: vehicle.id, tripId: id, note: `Naqd savdo · ${id}`, createdAt })
-      }
+      // Naqd savdo tushumi faqat tasdiqlashdan keyin kassaga tushadi (syncDemoTripCash).
+      // trips.auto_approve berilgan xodimda reys darhol tasdiqlangan bo'ladi — trigger
+      // kassani ham shunda yozadi, serverdagi sync_trip_cash_income bilan bir xil.
+      this.syncDemoTripCash(trip)
       this.persistDemo()
-      this.notify('Yangi reys muvaffaqiyatli saqlandi.')
+      this.notify(trip.monitoringStatus === 'approved'
+        ? 'Reys saqlandi va darhol tasdiqlangan — balansga yozildi.'
+        : 'Reys saqlandi va monitoringga yuborildi — tasdiqlashdan keyin balansga yoziladi.')
       return trip
     },
     async createPayment(payload) {
@@ -892,11 +1093,13 @@ export const useQuarryStore = defineStore('quarry', {
       } else {
         this.transactions.unshift({ id: makeId('TX'), direction: 'in', category: categoryKey, amount,
           paymentMethod: payload.paymentMethod, clientId: needsClient ? payload.clientId : null, driverId: null, vehicleId: null,
-          note: payload.note?.trim() || '', createdAt: new Date().toISOString() })
+          note: payload.note?.trim() || '', createdAt: new Date().toISOString(), monitoringStatus: 'approved' })
         this.persistDemo()
       }
       this.notify('Mijoz to‘lovi hisobga olindi.')
     },
+    // Chiqim monitoringga tushadi: kassa qoldig'i va oylikka faqat tasdiqlashdan keyin
+    // ta'sir qiladi. Kirim (createPayment) esa bundan mustasil — u darhol hisobga olinadi.
     async createExpense(payload) {
       const amount = Number(payload.amount)
       if (!(amount > 0)) throw new Error('Summa 0 dan katta bo‘lishi kerak.')
@@ -907,15 +1110,96 @@ export const useQuarryStore = defineStore('quarry', {
       }
       if (this.remoteMode) {
         const { data, error } = await supabase.from('transactions').insert(row).select('*').single()
-        if (error) throw error
+        if (error) throw new Error(readableDbError(error, 'Xarajatni saqlab bo‘lmadi.'))
         this.ingestRemoteTransaction(mapTransaction(data))
       } else {
         this.transactions.unshift({ id: makeId('TX'), direction: 'out', category: payload.category, amount,
           paymentMethod: payload.paymentMethod, clientId: null, driverId: payload.driverId || null,
-          vehicleId: payload.vehicleId || null, note: payload.note?.trim() || '', createdAt: new Date().toISOString() })
+          vehicleId: payload.vehicleId || null, note: payload.note?.trim() || '', createdAt: new Date().toISOString(),
+          monitoringStatus: 'pending', monitoredAt: null, monitoringNote: '' })
         this.persistDemo()
       }
-      this.notify('Xarajat muvaffaqiyatli saqlandi.')
+      this.notify('Xarajat saqlandi va monitoringga yuborildi — tasdiqlashdan keyin kassadan hisobga olinadi.')
+    },
+    // ── Monitoring: tasdiqlash / tasdiqlashni bekor qilish ───────────────────
+    // Reys: tasdiqlanganda mijoz balansiga yoziladi (yoki naqd savdo kassaga tushadi),
+    // bekor qilinganda esa bu ta'sir butunlay qaytariladi — DB trigger'i kassa yozuvini
+    // o'zi yaratadi/o'chiradi, shuning uchun bu yerda hech qanday qo'lda hisob yo'q.
+    async setTripMonitoring(tripId, approved, note = '') {
+      if (!this.canApproveMonitoring) throw new Error('Tasdiqlash huquqi yo‘q.')
+      if (this.remoteMode && (await this.checkMonitoringSchema()) === false) {
+        throw new Error(`Monitoring bazada yo‘lgan. ${SCHEMA_HINT}`)
+      }
+      const trip = this.trips.find((item) => item.id === tripId)
+      if (!trip) throw new Error('Reys topilmadi.')
+      if (monitoringStatusOf(trip) === (approved ? 'approved' : 'pending') && !note) {
+        this.notify(approved ? 'Reys allaqachon tasdiqlangan.' : 'Reys allaqachon kutilmoqda.')
+        return
+      }
+      if (this.remoteMode) {
+        const { error } = await supabase.rpc('set_trip_monitoring', { p_trip_id: tripId, p_approved: approved, p_note: note || null })
+        if (error) throw new Error(readableDbError(error, 'Reys holatini o‘zgartirib bo‘lmadi.'))
+        // serverdagi qatorni qayta o'qiymiz — monitored_by/monitored_at ham keladi
+        const { data, error: readError } = await supabase.from('trips').select('*').eq('id', tripId).single()
+        if (readError) throw new Error(readableDbError(readError, 'Reys holatini yangilab bo‘lmadi.'))
+        Object.assign(trip, mapTrip(data))
+        await this.refreshLedgerBalances()
+      } else {
+        trip.monitoringStatus = approved ? 'approved' : 'pending'
+        trip.monitoredAt = new Date().toISOString()
+        trip.monitoredBy = this.activeUserId
+        trip.monitoringNote = note || ''
+        this.syncDemoTripCash(trip)
+        this.persistDemo()
+      }
+      this.notify(approved
+        ? 'Reys tasdiqlandi — moliyaviy hisobga kiritildi.'
+        : 'Tasdiqlash bekor qilindi — moliyaviy ta’sir qaytarildi.')
+    },
+    // Naqd savdo reysi tasdiqlanganda kassaga tushum yozuvi, bekor qilinganda esa
+    // faqat shu reysga tegishli (trigger yaratgan) yozuv o'chadi.
+    syncDemoTripCash(trip) {
+      const index = this.transactions.findIndex((tx) => tx.tripId === trip.id && tx.category === 'cash_sale')
+      if (trip.saleType === 'cash' && trip.monitoringStatus === 'approved') {
+        if (index >= 0) return
+        this.transactions.unshift({
+          id: makeId('TX'), direction: 'in', category: 'cash_sale', amount: trip.totalAmount,
+          paymentMethod: 'cash', clientId: trip.clientId, driverId: null, vehicleId: trip.vehicleId,
+          tripId: trip.id, note: `Naqd savdo · ${trip.id}`, createdAt: new Date().toISOString(),
+          monitoringStatus: 'approved',
+        })
+        return
+      }
+      if (index >= 0) this.transactions.splice(index, 1)
+    },
+    async setExpenseMonitoring(transactionId, approved, note = '') {
+      if (!this.canApproveMonitoring) throw new Error('Tasdiqlash huquqi yo‘q.')
+      if (this.remoteMode && (await this.checkMonitoringSchema()) === false) {
+        throw new Error(`Monitoring bazada yo‘lgan. ${SCHEMA_HINT}`)
+      }
+      const transaction = this.transactions.find((item) => item.id === transactionId)
+      if (!transaction) throw new Error('Xarajat topilmadi.')
+      if (monitoringStatusOf(transaction) === (approved ? 'approved' : 'pending') && !note) {
+        this.notify(approved ? 'Xarajat allaqachon tasdiqlangan.' : 'Xarajat allaqachon kutilmoqda.')
+        return
+      }
+      if (this.remoteMode) {
+        const { error } = await supabase.rpc('set_expense_monitoring', { p_transaction_id: transactionId, p_approved: approved, p_note: note || null })
+        if (error) throw new Error(readableDbError(error, 'Xarajat holatini o‘zgartirib bo‘lmadi.'))
+        const { data, error: readError } = await supabase.from('transactions').select('*').eq('id', transactionId).single()
+        if (readError) throw new Error(readableDbError(readError, 'Xarajat holatini yangilab bo‘lmadi.'))
+        Object.assign(transaction, mapTransaction(data))
+        await this.refreshLedgerBalances()
+      } else {
+        transaction.monitoringStatus = approved ? 'approved' : 'pending'
+        transaction.monitoredAt = new Date().toISOString()
+        transaction.monitoredBy = this.activeUserId
+        transaction.monitoringNote = note || ''
+        this.persistDemo()
+      }
+      this.notify(approved
+        ? 'Xarajat tasdiqlandi — kassadan hisobga olindi.'
+        : 'Tasdiqlash bekor qilindi — xarajat yana kutilmoqda.')
     },
     async createClient(payload) {
       const row = { name: payload.name.trim(), phone: formatPhone(payload.phone) || null, contact_name: payload.contactName?.trim() || null, opening_balance: Number(payload.openingBalance || 0) }
@@ -1008,27 +1292,37 @@ export const useQuarryStore = defineStore('quarry', {
       this.notify('Xodim ma’lumotlari yangilandi.')
     },
     async saveRole(payload) {
-      const selected = [...new Set(payload.permissions || [])]
+      const grantsAll = payload.grantsAll === true
+      const selected = grantsAll ? [] : [...new Set(payload.permissions || [])]
       if (!payload.name?.trim()) throw new Error('Lavozim nomini kiriting.')
       const elevated = selected.filter((key) => !this.currentRole?.permissions?.includes(key))
-      if (elevated.length) throw new Error(`Sizda ushbu ruxsatlarni berish huquqi yo‘q: ${elevated.join(', ')}`)
+      if (elevated.length) {
+        // Bu xatoga ko'pincha yangi ruxsat kaliti qo'shilgan paytda chiqadi: eski
+        // "barcha ruxsatli" lavozim endi to'liq huquqli bo'lib qolmaydi va o'ziga
+        // yetishmaydigan kalitni o'ziga o'zi bera olmaydi. Endi buning uchun
+        // `grantsAll` belgisi bor — lavozimni o'ziga "barcha ruxsatlar avtomatik"
+        // qilib belgilash yetarli. Xabar o'sha yechimni ko'rsatadi.
+        throw new Error(`Sizda ushbu ruxsatlarni berish huquqi yo‘q: ${elevated.join(', ')}. Ularni o‘z lavomingizga ham berib bo‘lmaydi. Yechim: lavozimni «Barcha ruxsatlar avtomatik» deb belgilang (Sozlamalar → Lavozimlar) — u yangi kalitlarni ham avtomatik oladi.`)
+      }
       if (this.remoteMode) {
         let roleId = payload.id
         if (roleId) {
-          const { error } = await supabase.from('roles').update({ name: payload.name.trim(), description: payload.description?.trim() || '' }).eq('id', roleId)
+          const { error } = await supabase.from('roles').update({ name: payload.name.trim(), description: payload.description?.trim() || '', grants_all: grantsAll }).eq('id', roleId)
           if (error) throw error
         } else {
-          const { data, error } = await supabase.from('roles').insert({ name: payload.name.trim(), description: payload.description?.trim() || '' }).select('id').single()
+          const { data, error } = await supabase.from('roles').insert({ name: payload.name.trim(), description: payload.description?.trim() || '', grants_all: grantsAll }).select('id').single()
           if (error) throw error
           roleId = data.id
         }
-        const { error: permissionsError } = await supabase.rpc('save_role_permissions', { p_role_id: roleId, p_permission_keys: selected })
-        if (permissionsError) throw permissionsError
+        if (!grantsAll) {
+          const { error: permissionsError } = await supabase.rpc('save_role_permissions', { p_role_id: roleId, p_permission_keys: selected })
+          if (permissionsError) throw permissionsError
+        }
         await this.loadRemoteData()
       } else {
         const old = this.roles.find((role) => role.id === payload.id)
-        if (old) Object.assign(old, { name: payload.name.trim(), description: payload.description?.trim() || '', permissions: selected })
-        else this.roles.push({ id: makeId('R'), name: payload.name.trim(), description: payload.description?.trim() || '', permissions: selected, color: 'slate', isSystem: false })
+        if (old) Object.assign(old, { name: payload.name.trim(), description: payload.description?.trim() || '', grantsAll, permissions: grantsAll ? [...this.fullAccessKeys] : selected })
+        else this.roles.push({ id: makeId('R'), name: payload.name.trim(), description: payload.description?.trim() || '', grantsAll, permissions: grantsAll ? [...this.fullAccessKeys] : selected, color: 'slate', isSystem: false })
         this.persistDemo()
       }
       this.notify('Lavozim ruxsatlari saqlandi.')

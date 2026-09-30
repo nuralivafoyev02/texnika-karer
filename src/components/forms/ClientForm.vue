@@ -1,6 +1,5 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { Info } from 'lucide-vue-next'
 import FormActions from './FormActions.vue'
 import PhoneField from './PhoneField.vue'
 import { captureAmountInput, parseAmountInput } from '../../lib/format'
@@ -28,7 +27,6 @@ function submit() {
       <PhoneField v-model="form.phone" label="Telefon" hint="Aloqa uchun. +998 avtomatik qo‘shiladi." />
       <label class="sm:col-span-2"><span class="label">Boshlang‘ich balans</span><input :value="form.openingBalance" class="field" type="text" inputmode="text" autocomplete="off" placeholder="0" @input="onBalance" /><span class="mt-1 block text-[11px] text-muted">Musbat summa — mijoz qarzi; manfiy summa — mijoz avansi.</span></label>
     </div>
-    <div class="mt-4 flex gap-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-[11px] leading-4 text-blue-800"><Info :size="15" class="mt-0.5 shrink-0" /><span>Keyingi reyslar va mijoz to‘lovlari balansni avtomatik hisoblaydi.</span></div>
     <p v-if="error" class="mt-3 text-xs font-semibold text-danger">{{ error }}</p>
     <FormActions :loading="loading" submit-label="Mijozni qo‘shish" @cancel="emit('cancel')" />
   </form>

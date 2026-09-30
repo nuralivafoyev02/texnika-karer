@@ -313,7 +313,6 @@ async function logout() {
               <div class="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-mint text-leaf"><BookOpen :size="15" /></div>
               <div class="min-w-0 flex-1 text-left">
                 <p class="text-xs font-bold">Foydalanish yo‘riqnasi</p>
-                <p class="text-[10px] text-muted">Bo‘limlar, imkoniyatlar va ruxsatlar</p>
               </div>
             </button>
             <button v-if="!store.remoteMode" class="header-menu-item mt-1 text-danger" @click="clearDemo"><Trash2 :size="15" />Demo yozuvlarni tozalash</button>

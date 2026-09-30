@@ -1,7 +1,11 @@
 export const PERMISSION_CATALOG = [
   { key: 'dashboard.view', label: 'Dashboardni ko‘rish', group: 'Umumiy', description: 'Kunlik svotka va monitoring ko‘rsatkichlari' },
   { key: 'trips.view', label: 'Reyslarni ko‘rish', group: 'Karer', description: 'Barcha reyslar jurnali va yuklar tarixi' },
-  { key: 'trips.create', label: 'Yangi reys kiritish', group: 'Karer', description: 'Tarozi orqali yangi reysni tasdiqlash' },
+  { key: 'trips.create', label: 'Yangi reys kiritish', group: 'Karer', description: 'Tarozi orqali yangi reysni kiritish — reys monitoring navbatiga tasdiqlash uchun yuboriladi' },
+  { key: 'trips.auto_approve', label: 'Yangi reysni avtomatik tasdiqlash', group: 'Karer', description: 'Kiritilgan reys monitoring bo‘limiga o‘tmasdan, darhol tasdiqlangan holda saqlanadi' },
+  { key: 'materials.prices.view', label: 'Mahsulot narxlarini ko‘rish', group: 'Karer', description: 'Tonna narxi va reys qiymatini ko‘rish — haydovchi va tarozi ustasi ko‘rmaydi' },
+  { key: 'monitoring.view', label: 'Monitoringni ko‘rish', group: 'Monitoring', description: 'Tasdiqlash kutilayotgan reys va xarajatlarni ko‘rish' },
+  { key: 'monitoring.approve', label: 'Reys va xarajatlarni tasdiqlash', group: 'Monitoring', description: 'Reyslar va xarajatlarni tasdiqlash yoki tasdiqlashni bekor qilish' },
   { key: 'clients.view', label: 'Mijozlarni ko‘rish', group: 'Mijozlar', description: 'Mijozlar ro‘yxati va balanslari' },
   { key: 'clients.manage', label: 'Mijoz qo‘shish / tahrirlash', group: 'Mijozlar', description: 'Mijoz ma’lumotlarini boshqarish' },
   { key: 'fleet.view', label: 'Texnikalarni ko‘rish', group: 'Texnika', description: 'Samosvallar holati va ishlash ko‘rsatkichlari' },
@@ -33,6 +37,12 @@ export const hasFullAccess = (permissions, catalog = FULL_ACCESS_KEYS) => {
   const owned = new Set(permissions ?? [])
   return keys.length > 0 && keys.every((key) => owned.has(key))
 }
+
+// `grantsAll` — serverdagi roles.grants_all belgisi. Bunday lavozim katalogdagi barcha
+// kalitga ega bo'lishi shart emas: yangi kalit qo'shilsa ham u avtomatik oladi. Shu
+// sababli "barcha kalitni qo'lda belgilash" usuli yangi kalitda superadminni buzardi.
+export const roleGrantsAll = (role) => role?.grantsAll === true
+export const isFullAccessRole = (role, permissions, catalog) => roleGrantsAll(role) || hasFullAccess(permissions, catalog)
 
 export const PERMISSION_GROUPS = [...new Set(PERMISSION_CATALOG.map((item) => item.group))]
 export const permissionLabel = (key) => PERMISSION_CATALOG.find((item) => item.key === key)?.label ?? key

@@ -75,19 +75,25 @@ export const phoneProblem = (value: unknown) => {
 type Caller = { id: string; roleId: string; roleName: string; isSuperadmin: boolean }
 
 // ── To'liq dostugni aniqlash ────────────────────────────────────────────────
-// Superadmin — maxfiy lavozim emas: lavozimda ruxsat katalogidagi BARCHA kalitlar bor bo'lgan
-// xodim. Shu sabab bazadagi role_has_full_access() bilan bir xil qoida bu yerga ko'chiriladi,
-// ya'ni sxema triggerlari ishlamagan holatda ham to'g'ri javob keladi.
+// Superadmin — maxfiy lavozim emas. Ikki yo'l bor:
+//   1) `roles.grants_all` belgisi — yangi kalit qo'shilsa ham to'liq huquqni saqlaydi;
+//   2) katalogdagi BARCHA kalit qo'lda berilgan bo'lsa (eski sxema / boshqa rol).
+// Bazadagi role_has_full_access() bilan bir xil qoida, ya'ni sxema triggerlari ishlamagan
+// holatda ham to'g'ri javob keladi.
 export const permissionKeysForRole = async (admin: ReturnType<typeof createClient>, roleId: string) => {
-  const [{ data: links }, { data: catalog }] = await Promise.all([
+  const [{ data: links }, { data: catalog }, { data: role }] = await Promise.all([
     admin.from('role_permissions').select('permission_id').eq('role_id', roleId),
     admin.from('permissions').select('id,key'),
+    admin.from('roles').select('grants_all').eq('id', roleId).maybeSingle(),
   ])
   const keyById = new Map((catalog ?? []).map((row) => [row.id, row.key]))
   const keys = new Set((links ?? []).map((row) => keyById.get(row.permission_id)).filter(Boolean) as string[])
   const all = (catalog ?? []).map((row) => row.key)
-  // Katalog bo'sh bo'lsa hech kim to'liq dostubga ega deb hisoblanmasin.
-  return { keys, fullAccess: all.length > 0 && all.every((key) => keys.has(key)) }
+  // grants_all roliga katalog bo'sh bo'lsa ham to'liq huquq beriladi — bu uning
+  // ma'nosiga to'g'ri keladi ("barchasi" = hozirgi va kelgusi barcha ruxsatlar).
+  const grantsAll = (role as { grants_all?: boolean } | null)?.grants_all === true
+  if (grantsAll) for (const key of all) keys.add(key)
+  return { keys, fullAccess: grantsAll || (all.length > 0 && all.every((key) => keys.has(key))) }
 }
 // To'liq huquqli xodim xodim qo'sha, login/parol o'zgartira, lavozim va ruxsatlarni boshqara
 // oladi. Boshqa hech kim, roli qanchalik kuchli bo'lmasin.

@@ -58,7 +58,7 @@ async function submit() {
           <button class="btn-primary w-full !py-3" :disabled="busy">{{ busy ? 'Tekshirilmoqda…' : 'Kirish' }}<ArrowRight :size="16" /></button>
           <button v-if="store.session && store.dataError" type="button" class="btn-quiet w-full" @click="changeAccount">Boshqa hisob bilan kirish</button>
         </form>
-        <div class="mt-7 rounded-2xl border border-line bg-canvas px-4 py-3 text-[11px] leading-5 text-muted">Login va parolni tizim administratori beradi — o‘z-ozidan ro‘yxatdan o‘tish yo‘q.</div>
+        <div class="mt-7 rounded-2xl border border-line bg-canvas px-4 py-3 text-[11px] leading-5 text-muted">Login va parolni administrator beradi.</div>
       </div>
     </section>
   </main>

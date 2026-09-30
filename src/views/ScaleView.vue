@@ -9,8 +9,8 @@ import ModalDialog from '../components/ModalDialog.vue'
 import VehicleForm from '../components/forms/VehicleForm.vue'
 import StaffForm from '../components/forms/StaffForm.vue'
 import { useQuarryStore } from '../stores/quarry'
-import { money, number, dateTime, initials } from '../lib/format'
-import { sectionShort } from '../lib/guide'
+import { money, number, dateTime, initials, displayId } from '../lib/format'
+import { isPendingMonitoring } from '../lib/monitoring'
 
 const store = useQuarryStore()
 const router = useRouter()
@@ -102,11 +102,11 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
   <div class="mx-auto max-w-[1150px] space-y-5">
     <button class="btn-quiet !px-1 !py-1 text-xs" @click="router.push('/trips')"><ArrowLeft :size="15" /> Reyslar jurnaliga qaytish</button>
     <div class="flex flex-wrap items-end justify-between gap-4">
-      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Scale :size="15" /> Tarozixona</div><h1 class="page-title">Yangi reys</h1><p class="page-subtitle">{{ sectionShort(route.path) }}</p></div>
+      <div><div class="mb-1 flex items-center gap-2 text-xs font-semibold text-leaf"><Scale :size="15" /> Tarozixona</div><h1 class="page-title">Yangi reys</h1></div>
       <div v-if="activeVehicles.length" class="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs text-muted"><span class="status-dot"></span> {{ activeVehicles.length }} ta faol texnika</div>
     </div>
 
-    <div v-if="latestTrip" class="flex items-center gap-3 rounded-2xl border border-[#cddffc] bg-[#f0f6ff] p-4"><div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-leaf"><CircleCheck :size="20" /></div><div class="min-w-0 flex-1"><p class="text-sm font-bold text-forest">Reys muvaffaqiyatli tasdiqlandi</p><p class="mt-0.5 text-xs text-muted">{{ latestTrip.id }} · {{ number(latestTrip.weightTons, 1) }} t · {{ dateTime(latestTrip.createdAt) }}</p></div><button class="btn-secondary !px-3 !py-2 text-xs" @click="router.push('/trips')">Jurnalni ko‘rish</button><button class="btn-quiet !p-1" @click="latestTrip = null"><X :size="15" /></button></div>
+    <div v-if="latestTrip" class="flex items-center gap-3 rounded-2xl border border-[#cddffc] bg-[#f0f6ff] p-4"><div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-leaf"><CircleCheck :size="20" /></div><div class="min-w-0 flex-1"><p class="text-sm font-bold text-forest">{{ isPendingMonitoring(latestTrip) ? 'Reys saqlandi va monitoringga yuborildi' : 'Reys saqlandi va tasdiqlandi' }}</p><p class="mt-0.5 text-xs text-muted">{{ displayId(latestTrip.id) }} · {{ number(latestTrip.weightTons, 1) }} t · {{ dateTime(latestTrip.createdAt) }}</p></div><button class="btn-secondary !px-3 !py-2 text-xs" @click="router.push('/trips')">Jurnalni ko‘rish</button><button class="btn-quiet !p-1" @click="latestTrip = null"><X :size="15" /></button></div>
 
     <form class="grid items-start gap-5 lg:grid-cols-12" @submit.prevent="submit">
       <section class="card overflow-hidden lg:col-span-8">
@@ -121,16 +121,15 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
           <div>
             <div class="mb-2 flex items-center justify-between"><span class="label !mb-0">Mijoz / sotuv turi</span></div>
             <div class="grid gap-2 sm:grid-cols-2">
-              <button type="button" :class="form.saleType === 'credit' ? 'border-leaf bg-mint/70 ring-2 ring-blue-100' : 'border-line bg-white hover:bg-canvas'" class="flex items-center gap-3 rounded-xl border p-3.5 text-left" @click="form.saleType = 'credit'"><div class="grid h-9 w-9 place-items-center rounded-xl bg-white text-leaf"><UsersRound :size="17" /></div><span><strong class="block text-xs text-ink">Qarzga</strong><small class="mt-1 block text-[10px] text-muted">Balansga qarz sifatida yoziladi</small></span><span class="ml-auto h-4 w-4 rounded-full border" :class="form.saleType === 'credit' ? 'border-[5px] border-leaf bg-white' : 'border-slate-300'"></span></button>
-              <button type="button" :class="form.saleType === 'cash' ? 'border-leaf bg-mint/70 ring-2 ring-blue-100' : 'border-line bg-white hover:bg-canvas'" class="flex items-center gap-3 rounded-xl border p-3.5 text-left" @click="form.saleType = 'cash'"><div class="grid h-9 w-9 place-items-center rounded-xl bg-white text-leaf"><Coins :size="17" /></div><span><strong class="block text-xs text-ink">Naqd savdo</strong><small class="mt-1 block text-[10px] text-muted">Tushum kassaga qo‘shiladi</small></span><span class="ml-auto h-4 w-4 rounded-full border" :class="form.saleType === 'cash' ? 'border-[5px] border-leaf bg-white' : 'border-slate-300'"></span></button>
+              <button type="button" :class="form.saleType === 'credit' ? 'border-leaf bg-mint/70 ring-2 ring-blue-100' : 'border-line bg-white hover:bg-canvas'" class="flex items-center gap-3 rounded-xl border p-3.5 text-left" @click="form.saleType = 'credit'"><div class="grid h-9 w-9 place-items-center rounded-xl bg-white text-leaf"><UsersRound :size="17" /></div><span><strong class="block text-xs text-ink">Qarzga</strong></span><span class="ml-auto h-4 w-4 rounded-full border" :class="form.saleType === 'credit' ? 'border-[5px] border-leaf bg-white' : 'border-slate-300'"></span></button>
+              <button type="button" :class="form.saleType === 'cash' ? 'border-leaf bg-mint/70 ring-2 ring-blue-100' : 'border-line bg-white hover:bg-canvas'" class="flex items-center gap-3 rounded-xl border p-3.5 text-left" @click="form.saleType = 'cash'"><div class="grid h-9 w-9 place-items-center rounded-xl bg-white text-leaf"><Coins :size="17" /></div><span><strong class="block text-xs text-ink">Naqd savdo</strong></span><span class="ml-auto h-4 w-4 rounded-full border" :class="form.saleType === 'cash' ? 'border-[5px] border-leaf bg-white' : 'border-slate-300'"></span></button>
             </div>
             <div class="mt-3">
               <span class="label">Mijoz <span v-if="form.saleType === 'cash'" class="normal-case tracking-normal text-slate-400">(ixtiyoriy)</span></span>
               <div class="relative"><UserRound :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-leaf" /><select v-model="form.clientId" class="field pl-10" :required="form.saleType === 'credit'"><option value="">Mijozsiz — naqd savdo</option><option v-for="client in store.clients" :key="client.id" :value="client.id">{{ client.name }}</option></select></div>
               <!-- Naqd savdoda mijoz majburiy emas, lekin tanlansa jurnalda yuk kimka
                    tashilgani ko'rinadi (balansga qarz yozilmaydi). -->
-              <p v-if="form.saleType === 'cash'" class="mt-1.5 text-[10px] leading-4 text-muted">Kimga tashilganini yozib qolish uchun tanlang — balansga ta’sir qilmaydi.</p>
-              <p v-else-if="selectedClient" class="mt-1.5 text-[10px] text-muted">Joriy balans: <strong class="font-bold text-ink">{{ money(store.clientBalance(form.clientId)) }}</strong></p>
+              <p v-if="form.saleType !== 'cash' && selectedClient" class="mt-1.5 text-[10px] text-muted">Joriy balans: <strong class="font-bold text-ink">{{ money(store.clientBalance(form.clientId)) }}</strong></p>
             </div>
             <label class="mt-4 block"><span class="label">Izoh</span><textarea v-model="form.note" class="field resize-none" rows="2" placeholder="Masalan, qaysi obyektga tashildi"></textarea></label>
           </div>
@@ -138,7 +137,7 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
           <div class="border-t border-dashed border-line pt-5">
             <div class="mb-3 flex items-center justify-between"><div><h3 class="text-xs font-bold text-ink">Yuk ma’lumotlari</h3><p class="mt-1 text-[10px] text-muted">2-qadam · Material va tarozi ko‘rsatkichi</p></div><Sparkles :size="16" class="text-amber" /></div>
             <div class="grid gap-4 sm:grid-cols-2">
-              <label><span class="label">Mahsulot turi</span><select v-model="form.materialId" class="field" required><option value="" disabled>Mahsulot turini tanlang</option><option v-for="material in store.materials.filter((item) => item.isActive)" :key="material.id" :value="material.id">{{ material.name }} · {{ money(material.unitPrice, { short: true }) }}/t</option></select></label>
+              <label><span class="label">Mahsulot turi</span><select v-model="form.materialId" class="field" required><option value="" disabled>Mahsulot turini tanlang</option><option v-for="material in store.materials.filter((item) => item.isActive)" :key="material.id" :value="material.id">{{ store.canSeePrices ? `${material.name} · ${money(material.unitPrice, { short: true })}/t` : material.name }}</option></select></label>
               <label><span class="label">Miqdor</span><div class="relative"><Weight :size="17" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-leaf" /><input v-model="form.weightTons" class="field pl-10 pr-12 !py-3" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="0.0" required /><span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted">tonna</span></div></label>
               <label><span class="label">Ish vaqti</span><div class="relative"><Clock3 :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" /><input v-model="form.hoursWorked" class="field pl-10 pr-12" type="number" min="0" step="0.1" placeholder="1.2" /><span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-muted">soat</span></div></label>
               <div><span class="label">Rasm</span><input ref="fileInput" type="file" accept="image/*" capture="environment" class="hidden" @change="choosePhoto" /><div v-if="!photoPreview" class="flex h-[42px] items-center gap-3 rounded-xl border border-dashed border-[#bfd5c5] bg-[#f8fbff] px-3"><button type="button" class="flex items-center gap-2 text-xs font-semibold text-leaf" @click="fileInput?.click()"><ImagePlus :size="16" /> Rasm tanlash</button><span class="text-[10px] text-slate-400">JPG yoki PNG · maks. {{ store.remoteMode ? '10' : '1,5' }} MB</span></div><div v-else class="flex h-[42px] items-center gap-2 rounded-xl border border-line px-2"><img :src="photoPreview" alt="Yuk rasmi" class="h-8 w-8 rounded-lg object-cover" /><span class="min-w-0 flex-1 truncate text-[10px] font-semibold text-ink">{{ photoFile?.name }}</span><button type="button" class="btn-quiet !p-1.5" @click="removePhoto"><X :size="14" /></button></div></div>
@@ -150,11 +149,11 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
 
       <aside class="space-y-4 lg:sticky lg:top-[98px] lg:col-span-4">
         <div class="overflow-hidden rounded-2xl bg-[#0a4fa8] text-white shadow-soft">
-          <div class="flex items-center justify-between border-b border-white/10 px-5 py-4"><div><p class="text-[10px] font-bold uppercase tracking-[.15em] text-[#accaf7]">Reys hisob-kitobi</p><p class="mt-1 text-xs text-white/65">Narx avtomatik hisoblandi</p></div><div class="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-[#b9d4ff]"><Coins :size="18" /></div></div>
-          <div class="px-5 py-5"><div class="flex items-end justify-between gap-3"><div><p class="text-[10px] text-white/65">Umumiy qiymati</p><p class="mt-1 text-[27px] font-bold tracking-tight">{{ money(amount, { currency: false }) }}<span class="ml-1 text-xs font-semibold text-white/60">so‘m</span></p></div><div class="mb-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-[10px] font-semibold text-[#d2e4ff]">{{ selectedMaterial ? money(selectedMaterial.unitPrice) : 'Narx yo‘q' }} / t</div></div>
-            <div class="mt-5 space-y-2 border-t border-white/10 pt-4 text-xs"><div class="flex justify-between text-white/65"><span>Og‘irlik</span><strong class="font-semibold text-white">{{ number(form.weightTons, 1) }} t</strong></div><div class="flex justify-between text-white/65"><span>Mahsulot</span><strong class="font-semibold text-white">{{ selectedMaterial?.name || 'Tanlanmagan' }}</strong></div><div class="flex justify-between text-white/65"><span>Sotuv turi</span><strong class="font-semibold text-white">{{ form.saleType === 'cash' ? 'Naqd savdo' : 'Mijozga hisobga' }}</strong></div></div>
+          <div class="flex items-center justify-between border-b border-white/10 px-5 py-4"><div><p class="text-[10px] font-bold uppercase tracking-[.15em] text-[#accaf7]">Reys hisob-kitobi</p></div><div class="grid h-9 w-9 place-items-center rounded-xl bg-white/10 text-[#b9d4ff]"><Coins :size="18" /></div></div>
+          <div class="px-5 py-5"><div class="flex items-end justify-between gap-3"><div><p class="text-[10px] text-white/65">Umumiy qiymati</p><p v-if="store.canSeePrices" class="mt-1 text-[27px] font-bold tracking-tight">{{ money(amount, { currency: false }) }}<span class="ml-1 text-xs font-semibold text-white/60">so‘m</span></p><p v-else class="mt-1 text-[15px] font-bold">Narx yashirilgan</p></div><div v-if="store.canSeePrices" class="mb-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-[10px] font-semibold text-[#d2e4ff]">{{ selectedMaterial ? money(selectedMaterial.unitPrice) : 'Narx yo‘q' }} / t</div></div>
+            <div class="mt-5 space-y-2 border-t border-white/10 pt-4 text-xs"><div class="flex justify-between text-white/65"><span>Og‘irlik</span><strong class="font-semibold text-white">{{ number(form.weightTons, 1) }} t</strong></div><div class="flex justify-between text-white/65"><span>Mahsulot</span><strong class="font-semibold text-white">{{ selectedMaterial?.name || 'Tanlanmagan' }}</strong></div><div class="flex justify-between text-white/65"><span>Sotuv turi</span><strong class="font-semibold text-white">{{ form.saleType === 'cash' ? 'Naqd savdo' : 'Qarzga' }}</strong></div></div>
           </div>
-          <div class="bg-white/[.07] px-5 py-3 text-[10px] leading-4 text-white/65">Tasdiqlangan reys jurnalga yoziladi.</div>
+          <div class="bg-white/[.07] px-5 py-3 text-[10px] leading-4 text-white/65">{{ store.canAutoApproveTrips ? 'Reys darhol tasdiqlanadi.' : 'Reys monitoringga yuboriladi.' }}</div>
         </div>
 
         <div class="card p-4">
@@ -166,16 +165,16 @@ onBeforeUnmount(() => { if (photoPreview.value) URL.revokeObjectURL(photoPreview
           </div>
         </div>
 
-        <button type="submit" class="btn-primary w-full !rounded-2xl !py-3.5 !text-sm" :disabled="saving || !readyToSave || !activeVehicles.length"><CircleCheck :size="18" />{{ saving ? 'Saqlanmoqda…' : 'Reysni tasdiqlash' }}</button>
+        <button type="submit" class="btn-primary w-full !rounded-2xl !py-3.5 !text-sm" :disabled="saving || !readyToSave || !activeVehicles.length"><CircleCheck :size="18" />{{ saving ? 'Saqlanmoqda…' : 'Reysni saqlash' }}</button>
       </aside>
     </form>
-    <ModalDialog v-model="showVehicle" title="Yangi texnika qo‘shish" description="Reys kiritish uchun samosval kerak.">
+    <ModalDialog v-model="showVehicle" title="Yangi texnika qo‘shish">
       <VehicleForm :drivers="store.drivers" :initial-driver-id="newDriverId" :can-add-driver="store.canManageStaff" :loading="vehicleSaving" @submit="addVehicle" @add-driver="showDriver = true" @cancel="showVehicle = false" />
     </ModalDialog>
-    <ModalDialog v-model="showDriver" title="Yangi haydovchi qo‘shish" description="Login va parol shu zahotiyoq yaratiladi." width="max-w-2xl">
+    <ModalDialog v-model="showDriver" title="Yangi haydovchi qo‘shish" width="max-w-2xl">
       <StaffForm :roles="store.roles" :initial-role-id="driverRole" :demo-mode="!store.remoteMode" :loading="vehicleSaving" @submit="addDriver" @cancel="showDriver = false" />
     </ModalDialog>
-    <ModalDialog :model-value="Boolean(credentials)" title="Xodim tizimga tayyor" description="Login va parolni xodimga yetkazing." @update:model-value="credentials = null">
+    <ModalDialog :model-value="Boolean(credentials)" title="Xodim tizimga tayyor" @update:model-value="credentials = null">
       <div class="space-y-4">
         <div class="rounded-2xl border border-mint bg-[#f4f9ff] p-4"><p class="text-[10px] font-bold uppercase tracking-wide text-muted">{{ credentials?.name }}</p><dl class="mt-3 space-y-2 text-sm"><div class="flex items-center justify-between gap-3"><dt class="text-muted">Login</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.login }}</code></dd></div><div class="flex items-center justify-between gap-3"><dt class="text-muted">Parol</dt><dd><code class="rounded-md bg-white px-2 py-1 text-xs font-bold text-ink">{{ credentials?.password }}</code></dd></div></dl></div>
         <div class="flex justify-end gap-2"><button class="btn-secondary" type="button" @click="credentials = null">Yopish</button></div>

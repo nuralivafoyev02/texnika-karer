@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { Package, Plus, Trash2, Check, ShieldCheck } from 'lucide-vue-next'
+import { Package, Plus, Trash2, Check } from 'lucide-vue-next'
 import { useQuarryStore } from '../../stores/quarry'
 import { formatAmountInput, parseAmountInput, captureAmountInput, money } from '../../lib/format'
 
@@ -42,7 +42,6 @@ async function removeMaterial(material) {
       <div class="flex items-center justify-between border-b border-line px-5 py-4">
         <div>
           <h2 class="section-title">Mahsulotlar va tonna narxlari</h2>
-          <p class="mt-1 text-xs text-muted">Reys tasdiqlanganda narx tarixiy yozuvga snapshot sifatida saqlanadi.</p>
         </div>
         <div class="grid h-9 w-9 place-items-center rounded-xl bg-mint text-leaf"><Package :size="17" /></div>
       </div>
@@ -86,7 +85,6 @@ async function removeMaterial(material) {
         <div class="flex items-center justify-between">
           <div>
             <h2 class="section-title">Mahsulot qo‘shish</h2>
-            <p class="mt-1 text-xs text-muted">Yangi tosh turi va bir tonna uchun narx.</p>
           </div>
           <div class="grid h-9 w-9 place-items-center rounded-xl bg-mint text-leaf"><Plus :size="17" /></div>
         </div>
@@ -100,14 +98,6 @@ async function removeMaterial(material) {
           </label>
           <button class="btn-primary w-full" :disabled="saving"><Plus :size="16" /> {{ saving ? 'Qo‘shilmoqda…' : 'Mahsulot qo‘shish' }}</button>
         </form>
-      </section>
-
-      <section class="flex items-start gap-3 rounded-2xl border border-[#d8e4f5] bg-[#f4f8ff] p-4">
-        <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><ShieldCheck :size="17" /></div>
-        <div>
-          <p class="text-xs font-bold text-forest">Nega o‘chirib bo‘lmaydi?</p>
-          <p class="mt-1 text-[11px] leading-5 text-[#5b7295]">Reysda ishlatilgan mahsulot o‘chirilmaydi — tizim ishlatilganligini sabab sifatida ko‘rsatadi.</p>
-        </div>
       </section>
     </aside>
   </div>

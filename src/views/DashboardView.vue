@@ -1,13 +1,14 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Weight, Truck, CircleDollarSign, TrendingUp, WalletCards, ArrowUpRight, ArrowDownRight,
-  ChevronRight, Activity, Wrench, UsersRound, CircleAlert, Banknote,
+  ChevronRight, Activity, Wrench, UsersRound, CircleAlert, Banknote, ClipboardCheck,
 } from 'lucide-vue-next'
 import MetricCard from '../components/MetricCard.vue'
+import TripPreviewModal from '../components/TripPreviewModal.vue'
 import { useQuarryStore } from '../stores/quarry'
-import { dateLong, dateTime, money, number, greeting, initials } from '../lib/format'
+import { dateLong, dateOnly, timeOnly, money, number, greeting, initials } from '../lib/format'
 
 const store = useQuarryStore()
 const router = useRouter()
@@ -18,6 +19,7 @@ const activeVehicles = computed(() => store.vehicles.filter((vehicle) => vehicle
 const clientRows = computed(() => store.clients.map((client) => ({ ...client, balance: store.clientBalance(client.id) })).sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).slice(0, 4))
 const fleetPreview = computed(() => store.vehicles.slice(0, 4))
 const todayLabel = computed(() => dateLong())
+const selectedTrip = ref(null)
 function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.value) * 136)) }
 </script>
 
@@ -27,9 +29,14 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
       <div>
         <p class="text-xs font-semibold capitalize text-leaf">{{ todayLabel }}</p>
         <h1 class="mt-1 text-[27px] font-bold tracking-[-.035em] text-ink">{{ greeting() }}, {{ store.currentUser?.fullName?.split(' ')[0] }} <span>👋</span></h1>
-        <p class="mt-1 text-sm text-muted">Kareringizdagi bugungi ish faoliyati va asosiy ko‘rsatkichlar.</p>
       </div>
     </div>
+
+    <button v-if="store.canViewMonitoring && store.pendingMonitoringCount" class="flex w-full items-center gap-3 rounded-2xl border border-[#f2dfc2] bg-[#fff9ef] px-4 py-3.5 text-left transition hover:border-[#e6c891]" @click="router.push('/monitoring')">
+      <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#ffefcf] text-[#ad7122]"><ClipboardCheck :size="17" /></div>
+      <div class="min-w-0 flex-1"><p class="text-xs font-bold text-[#764b16]">{{ store.pendingMonitoringCount }} ta yozuv monitoringda kutilmoqda</p><p class="mt-0.5 truncate text-[11px] text-[#99784b]">{{ store.pendingTrips.length }} reys · {{ store.pendingExpenses.length }} xarajat</p></div>
+      <ChevronRight :size="17" class="shrink-0 text-[#ad7122]" />
+    </button>
 
     <button v-if="store.openReports.length" class="flex w-full items-center gap-3 rounded-2xl border border-[#f2dfc2] bg-[#fff9ef] px-4 py-3.5 text-left transition hover:border-[#e6c891]" @click="router.push('/fleet')">
       <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#ffefcf] text-[#ad7122]"><CircleAlert :size="17" /></div>
@@ -39,15 +46,15 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
 
     <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard label="Bugun tashilgan" :value="`${number(store.todayTonnage, 1)} t`" :detail="`${store.todayTrips.length} ta reys amalga oshirildi`" :icon="Weight" tone="green" trend="Bugun" />
-      <MetricCard label="Bugungi tushum" :value="money(store.todayCashIn, { short: true })" detail="Naqd va bank kirimlari" :icon="CircleDollarSign" tone="blue" />
-      <MetricCard label="Kunlik sof foyda" :value="money(store.todayProfit, { short: true })" detail="Sotuv qiymati − kunlik chiqim" :icon="TrendingUp" tone="amber" />
-      <MetricCard label="Faol samosvallar" :value="`${activeVehicles} / ${store.vehicles.length}`" detail="Hozir ishga tayyor texnika" :icon="Truck" tone="violet" />
+      <MetricCard label="Bugungi tushum" :value="money(store.todayCashIn, { short: true })" :icon="CircleDollarSign" tone="blue" />
+      <MetricCard label="Kunlik sof foyda" :value="money(store.todayProfit, { short: true })" :icon="TrendingUp" tone="amber" />
+      <MetricCard label="Faol samosvallar" :value="`${activeVehicles} / ${store.vehicles.length}`" :icon="Truck" tone="violet" />
     </section>
 
     <section class="grid gap-5 xl:grid-cols-12">
       <article class="card p-5 sm:p-6 xl:col-span-8">
         <div class="flex flex-wrap items-start justify-between gap-3">
-          <div><h2 class="section-title">Haftalik moliyaviy oqim</h2><p class="mt-1 text-xs text-muted">Sotuv qiymati va karer xarajatlari</p></div>
+          <div><h2 class="section-title">Haftalik moliyaviy oqim</h2></div>
           <div class="flex items-center gap-4 text-[10px] font-semibold text-muted"><span class="flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-leaf"></i>Sotuv</span><span class="flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-[#e8ad62]"></i>Xarajat</span></div>
         </div>
         <div class="mt-7 grid h-[185px] grid-cols-7 gap-2 sm:gap-5">
@@ -61,15 +68,15 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
         </div>
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f7fafd] px-4 py-3">
           <div class="flex items-center gap-2 text-[11px] text-muted"><Activity :size="15" class="text-leaf" /><span>Bugungi savdo qiymati</span></div>
-          <div class="flex items-center gap-2"><span class="text-sm font-bold text-ink">{{ money(store.todaySales, { short: true }) }}</span><span class="rounded-md bg-[#e9f2ff] px-1.5 py-1 text-[9px] font-bold text-leaf">{{ number(store.todayTonnage, 1) }} t</span></div>
+          <div class="flex flex-wrap items-center gap-2"><span class="text-sm font-bold text-ink">{{ money(store.todaySales, { short: true }) }}</span><span class="rounded-md bg-[#e9f2ff] px-1.5 py-1 text-[9px] font-bold text-leaf">{{ number(store.todayTonnage, 1) }} t</span><span v-if="store.todayPendingTrips" class="rounded-md bg-[#fff2d9] px-1.5 py-1 text-[9px] font-bold text-[#96621d]">+{{ store.todayPendingTrips }} kutilmoqda</span></div>
         </div>
       </article>
 
       <article class="card p-5 sm:p-6 xl:col-span-4">
-        <div class="flex items-start justify-between"><div><h2 class="section-title">Pul mablag‘lari</h2><p class="mt-1 text-xs text-muted">Kassa va bank qoldig‘i</p></div><div class="grid h-9 w-9 place-items-center rounded-xl bg-[#eaf2fa] text-[#4f7595]"><WalletCards :size="18" /></div></div>
+        <div class="flex items-start justify-between"><div><h2 class="section-title">Pul mablag‘lari</h2></div><div class="grid h-9 w-9 place-items-center rounded-xl bg-[#eaf2fa] text-[#4f7595]"><WalletCards :size="18" /></div></div>
         <div class="mt-6 space-y-3">
-          <div class="flex items-center justify-between rounded-xl border border-line px-3.5 py-3"><div class="flex items-center gap-3"><div class="grid h-8 w-8 place-items-center rounded-lg bg-[#fff4e3] text-[#b77824]"><Banknote :size="16" /></div><div><p class="text-xs font-semibold text-ink">Naqd kassa</p><p class="mt-0.5 text-[10px] text-muted">Joriy qoldiq</p></div></div><strong class="text-sm font-bold text-ink">{{ money(store.cashBalance, { short: true }) }}</strong></div>
-          <div class="flex items-center justify-between rounded-xl border border-line px-3.5 py-3"><div class="flex items-center gap-3"><div class="grid h-8 w-8 place-items-center rounded-lg bg-[#eaf2fa] text-[#4f7595]"><WalletCards :size="16" /></div><div><p class="text-xs font-semibold text-ink">Bank hisob raqami</p><p class="mt-0.5 text-[10px] text-muted">Joriy qoldiq</p></div></div><strong class="text-sm font-bold text-ink">{{ money(store.bankBalance, { short: true }) }}</strong></div>
+          <div class="flex items-center justify-between rounded-xl border border-line px-3.5 py-3"><div class="flex items-center gap-3"><div class="grid h-8 w-8 place-items-center rounded-lg bg-[#fff4e3] text-[#b77824]"><Banknote :size="16" /></div><div><p class="text-xs font-semibold text-ink">Naqd kassa</p></div></div><strong class="text-sm font-bold text-ink">{{ money(store.cashBalance, { short: true }) }}</strong></div>
+          <div class="flex items-center justify-between rounded-xl border border-line px-3.5 py-3"><div class="flex items-center gap-3"><div class="grid h-8 w-8 place-items-center rounded-lg bg-[#eaf2fa] text-[#4f7595]"><WalletCards :size="16" /></div><div><p class="text-xs font-semibold text-ink">Bank hisob raqami</p></div></div><strong class="text-sm font-bold text-ink">{{ money(store.bankBalance, { short: true }) }}</strong></div>
         </div>
         <div class="mt-4 flex items-center justify-between rounded-xl bg-[#f7fafd] px-3.5 py-3"><span class="text-xs font-semibold text-muted">Ochiq nosozliklar</span><span class="text-sm font-bold" :class="store.openReports.length ? 'text-amber' : 'text-leaf'">{{ store.openReports.length }} ta</span></div>
         <button v-if="store.can('finance.view')" class="mt-3 flex w-full items-center justify-between px-1 py-2 text-xs font-bold text-leaf hover:text-forest" @click="router.push('/finance')">Moliyaviy hisobotga o‘tish <ArrowUpRight :size="15" /></button>
@@ -78,16 +85,16 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
 
     <section class="grid gap-5 xl:grid-cols-12">
       <article class="card min-w-0 overflow-hidden xl:col-span-8">
-        <div class="flex items-center justify-between gap-3 px-5 py-5 sm:px-6"><div><h2 class="section-title">So‘nggi reyslar</h2><p class="mt-1 text-xs text-muted">Karerdan chiqqan oxirgi yuklar</p></div><button v-if="store.can('trips.view')" class="btn-quiet !px-2.5 !py-2 text-xs" @click="router.push('/trips')">Barchasi <ChevronRight :size="15" /></button></div>
+        <div class="flex items-center justify-between gap-3 px-5 py-5 sm:px-6"><div><h2 class="section-title">So‘nggi reyslar</h2></div><button v-if="store.can('trips.view')" class="btn-quiet !px-2.5 !py-2 text-xs" @click="router.push('/trips')">Barchasi <ChevronRight :size="15" /></button></div>
         <div class="overflow-x-auto">
           <table class="w-full min-w-[640px] border-collapse text-left">
-            <thead><tr class="table-head border-y border-line"><th class="px-5 py-3 sm:px-6">Reys / vaqt</th><th class="px-4 py-3">Samosval</th><th class="px-4 py-3">Mijoz</th><th class="px-4 py-3">Og‘irlik</th><th class="px-5 py-3 text-right sm:px-6">Qiymati</th></tr></thead>
-            <tbody><tr v-for="trip in recentTrips" :key="trip.id" class="border-b border-[#f0f2f0] last:border-0 hover:bg-[#fbfcfb]">
-              <td class="px-5 py-3.5 sm:px-6"><p class="text-xs font-bold text-ink">{{ trip.id }}</p><p class="mt-1 text-[10px] text-muted">{{ dateTime(trip.createdAt) }}</p></td>
+            <thead><tr class="table-head border-y border-line"><th class="px-5 py-3 sm:px-6">Sana / Vaqt</th><th class="px-4 py-3">Samosval</th><th class="px-4 py-3">Mijoz</th><th class="px-4 py-3">Og‘irlik</th><th class="px-5 py-3 text-right sm:px-6">Qiymati</th></tr></thead>
+            <tbody><tr v-for="trip in recentTrips" :key="trip.id" class="cursor-pointer border-b border-[#f0f2f0] last:border-0 transition hover:bg-[#f7fafd]" title="Batafsil ko‘rish" @click="selectedTrip = trip">
+              <td class="px-5 py-3.5 sm:px-6"><p class="text-xs font-bold text-ink">{{ dateOnly(trip.createdAt) }}</p><p class="mt-1 text-[10px] text-muted">{{ timeOnly(trip.createdAt) }}</p></td>
               <td class="px-4 py-3.5"><p class="text-xs font-semibold text-ink">{{ store.vehicles.find((v) => v.id === trip.vehicleId)?.plate || '—' }}</p><p class="mt-1 text-[10px] text-muted">{{ store.driverName(trip.driverId) }}</p></td>
               <td class="max-w-[175px] px-4 py-3.5"><p class="truncate text-xs text-ink">{{ store.tripClient(trip) }}</p><span :class="trip.saleType === 'cash' ? 'tag-cash' : 'tag-credit'" class="tag mt-1">{{ trip.saleType === 'cash' ? 'Naqd' : 'Hisobga' }}</span></td>
               <td class="px-4 py-3.5"><span class="text-xs font-bold text-ink">{{ number(trip.weightTons, 1) }} t</span><p class="mt-1 text-[10px] text-muted">{{ store.materialName(trip.materialId) }}</p></td>
-              <td class="px-5 py-3.5 text-right sm:px-6"><span class="text-xs font-bold text-ink">{{ money(trip.totalAmount, { short: true }) }}</span></td>
+              <td class="px-5 py-3.5 text-right sm:px-6"><span v-if="store.canSeePrices" class="text-xs font-bold text-ink">{{ money(trip.totalAmount, { short: true }) }}</span><span v-else class="text-xs font-semibold text-muted">Yashirilgan</span></td>
             </tr><tr v-if="!recentTrips.length"><td colspan="5" class="px-6 py-10 text-center text-sm text-muted">Hozircha reyslar yo‘q.</td></tr></tbody>
           </table>
         </div>
@@ -106,7 +113,7 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
         </article>
 
         <article class="card p-5">
-          <div class="flex items-center justify-between"><div><h2 class="section-title">Mijozlar balansi</h2><p class="mt-1 text-xs text-muted">Qarz va avanslar</p></div><button v-if="store.can('clients.view')" class="btn-quiet !p-2" aria-label="Mijozlarni ko‘rish" @click="router.push('/clients')"><ChevronRight :size="16" /></button></div>
+          <div class="flex items-center justify-between"><div><h2 class="section-title">Mijozlar balansi</h2></div><button v-if="store.can('clients.view')" class="btn-quiet !p-2" aria-label="Mijozlarni ko‘rish" @click="router.push('/clients')"><ChevronRight :size="16" /></button></div>
           <div class="mt-3 space-y-2.5">
             <div v-for="client in clientRows" :key="client.id" class="flex items-center gap-2.5">
               <div class="avatar avatar-small" :class="client.balance < 0 ? 'avatar-blue' : ''">{{ initials(client.name) }}</div>
@@ -117,5 +124,8 @@ function barHeight(amount) { return Math.max(4, Math.round((amount / chartMax.va
         </article>
       </div>
     </section>
+
+    <TripPreviewModal :model-value="Boolean(selectedTrip)" :trip="selectedTrip"
+      @update:model-value="(value) => { if (!value) selectedTrip = null }" />
   </div>
 </template>

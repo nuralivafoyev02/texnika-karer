@@ -1,5 +1,9 @@
+-- ══════════ 01_core_rbac ══════════
+
 -- Texnika ERP · Supabase / PostgreSQL schema
 -- Run this file once in Supabase SQL Editor (project owner).
+-- Bu fayl supabase/migrations/01..09 dan yig'ilgan. Yangi ruxsat kaliti qo'shilsa,
+-- to'liq huquqli lavozim uni avtomatik oladi (roles.grants_all + trigger).
 -- Authentication identities live in auth.users; public.users stores their ERP profile.
 
 create extension if not exists pgcrypto;
@@ -10,6 +14,11 @@ create table if not exists public.roles (
   name text not null unique,
   description text not null default '',
   is_system boolean not null default false,
+  -- "Barcha ruxsatlar avtomatik" belgisi. To'liq huquqli (superadmin) lavozim shunday
+  -- belgilansa, serverga yangi ruxsat kaliti qo'shilganda u shu roliga avtomatik
+  -- beriladi va xodim superadminligini yo'qotmaydi. Aks holda "barcha kalit bor"
+  -- qoidasi yangi kalit qo'shilishi bilan buzilardi.
+  grants_all boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -98,7 +107,11 @@ alter table public.users alter column login set not null;
 insert into public.permissions (key, label, group_name, description) values
   ('dashboard.view', 'Dashboardni ko‘rish', 'Umumiy', 'Kunlik svotka va monitoring ko‘rsatkichlari'),
   ('trips.view', 'Reyslarni ko‘rish', 'Karer', 'Barcha reyslar jurnali va yuklar tarixi'),
-  ('trips.create', 'Yangi reys kiritish', 'Karer', 'Tarozi orqali yangi reysni tasdiqlash'),
+  ('trips.create', 'Yangi reys kiritish', 'Karer', 'Tarozi orqali yangi reysni kiritish — reys monitoring tasdiqlashiga yuboriladi'),
+  ('trips.auto_approve', 'Yangi reysni avtomatik tasdiqlash', 'Karer', 'Kiritilgan reys monitoring bo‘limiga o‘tmasdan, darhol tasdiqlangan holda saqlanadi'),
+  ('materials.prices.view', 'Mahsulot narxlarini ko‘rish', 'Karer', 'Tonna narxi va reys summasini ko‘rish (haydovchilar ko‘rmaydi)'),
+  ('monitoring.view', 'Monitoringni ko‘rish', 'Monitoring', 'Tasdiqlash kutilayotgan reys va xarajatlarni ko‘rish'),
+  ('monitoring.approve', 'Reyslarni tasdiqlash', 'Monitoring', 'Reyslar va xarajatlarni tasdiqlash yoki tasdiqlashni bekor qilish'),
   ('clients.view', 'Mijozlarni ko‘rish', 'Mijozlar', 'Mijozlar ro‘yxati va balanslari'),
   ('clients.manage', 'Mijoz qo‘shish / tahrirlash', 'Mijozlar', 'Mijoz ma’lumotlarini boshqarish'),
   ('fleet.view', 'Texnikalarni ko‘rish', 'Texnika', 'Samosvallar holati va ishlash ko‘rsatkichlari'),
@@ -118,13 +131,14 @@ insert into public.permissions (key, label, group_name, description) values
   ('maintenance.report', 'Nosozlik haqida xabar berish', 'Texnika', 'Texnika bo‘yicha tezkor xabar yuborish')
 on conflict (key) do update set label = excluded.label, group_name = excluded.group_name, description = excluded.description;
 
-insert into public.roles (name, description, is_system) values
-  ('Boshliq', 'Barcha bo‘limlar va tizim sozlamalari', true),
-  ('Buxgalter', 'Moliya, mijozlar va ish haqi hisobi', true),
-  ('Tarozi ustasi', 'Reyslarni ro‘yxatga olish', true),
-  ('Haydovchi', 'Faqat o‘z ish faoliyati va xabarlari', true)
-on conflict (name) do update set description = excluded.description, is_system = true;
+insert into public.roles (name, description, is_system, grants_all) values
+  ('Boshliq', 'Barcha bo‘limlar va tizim sozlamalari', true, true),
+  ('Buxgalter', 'Moliya, mijozlar va ish haqi hisobi', true, false),
+  ('Tarozi ustasi', 'Reyslarni ro‘yxatga olish', true, false),
+  ('Haydovchi', 'Faqat o‘z ish faoliyati va xabarlari', true, false)
+on conflict (name) do update set description = excluded.description, is_system = true, grants_all = excluded.grants_all;
 
+-- "Boshliq" — to'liq huquqli lavozim: katalogdagi barcha kalitlar beriladi.
 insert into public.role_permissions (role_id, permission_id)
 select r.id, p.id from public.roles r cross join public.permissions p where r.name = 'Boshliq'
 on conflict do nothing;
@@ -147,6 +161,8 @@ select r.id, p.id from public.roles r join public.permissions p on p.key = any(a
   'driver.self','maintenance.report'
 ]) where r.name = 'Haydovchi'
 on conflict do nothing;
+
+-- ══════════ 02_trips_transactions_monitoring ══════════
 
 -- ── Quarry operations ─────────────────────────────────────────────────────
 create table if not exists public.clients (
@@ -205,6 +221,22 @@ create table if not exists public.trips (
 -- `create table if not exists` mavjud bazani yangimaydi — shu satrlar eski
 -- bazalarni ham shu fayl qayta ishga tushirilganda yangilaydi.
 alter table public.trips add column if not exists note text;
+-- ── Monitoring: reys va xarajat tasdiqlanmaguncha moliyaviy hisobga kiritilmaydi ──
+-- Reys yaratilgach 'pending' bo'ladi; monitoring bo'limidan tasdiqlanganda 'approved'
+-- bo'ladi va shu zahoti naqd savdo kassaga yoziladi hamda mijoz balansiga ta'sir qiladi.
+alter table public.trips add column if not exists monitoring_status text;
+alter table public.trips add column if not exists monitored_by uuid references public.users(id) on delete set null;
+alter table public.trips add column if not exists monitored_at timestamptz;
+alter table public.trips add column if not exists monitoring_note text;
+-- Eski reyslar allaqachon ishga tushgan edi — ularni "kutilmoqda"ga qaytarib qo'yib,
+-- butun tarixni monitoring navbatiga tushirishdan saqlanamyiz.
+update public.trips set monitoring_status = 'approved', monitored_at = created_at
+  where monitoring_status is null;
+alter table public.trips alter column monitoring_status set default 'pending';
+alter table public.trips alter column monitoring_status set not null;
+alter table public.trips drop constraint if exists trips_monitoring_status_check;
+alter table public.trips add constraint trips_monitoring_status_check check (monitoring_status in ('pending','approved'));
+create index if not exists trips_monitoring_status_idx on public.trips(monitoring_status, created_at desc);
 alter table public.trips drop constraint if exists trip_sale_client_check;
 alter table public.trips add constraint trip_sale_client_check check (
   (sale_type = 'credit' and client_id is not null) or (sale_type = 'cash')
@@ -239,6 +271,22 @@ create index if not exists transactions_client_idx on public.transactions(client
 create index if not exists transactions_vehicle_idx on public.transactions(vehicle_id);
 create index if not exists transactions_driver_idx on public.transactions(driver_id, created_at desc);
 
+-- ── Monitoring (moliya): chiqimlar tasdiqlanmaguncha kassa va xarajatlarga tushmaydi ──
+-- Faqat CHIQIM ('out') yozuvlar monitoringga keladi: mijoz to'lovi (kirim) darhol
+-- hisobga olinadi. Kiritgan xodim monitoring_status'ni o'zi ko'ra olmaydi —
+-- quyidagi trigger qiymatni serverda belgilaydi.
+alter table public.transactions add column if not exists monitoring_status text;
+alter table public.transactions add column if not exists monitored_by uuid references public.users(id) on delete set null;
+alter table public.transactions add column if not exists monitored_at timestamptz;
+alter table public.transactions add column if not exists monitoring_note text;
+update public.transactions set monitoring_status = 'approved', monitored_at = created_at
+  where monitoring_status is null;
+alter table public.transactions alter column monitoring_status set default 'approved';
+alter table public.transactions alter column monitoring_status set not null;
+alter table public.transactions drop constraint if exists transactions_monitoring_status_check;
+alter table public.transactions add constraint transactions_monitoring_status_check check (monitoring_status in ('pending','approved'));
+create index if not exists transactions_monitoring_idx on public.transactions(monitoring_status, direction, created_at desc);
+
 create table if not exists public.maintenance_reports (
   id uuid primary key default gen_random_uuid(),
   vehicle_id uuid not null references public.vehicles(id) on delete restrict,
@@ -249,6 +297,8 @@ create table if not exists public.maintenance_reports (
   resolved_at timestamptz
 );
 create index if not exists maintenance_open_idx on public.maintenance_reports(status, created_at desc);
+
+-- ══════════ 03_maintenance_views ══════════
 
 -- A driver-submitted fault automatically removes the vehicle from dispatch until a manager reactivates it.
 create or replace function public.flag_reported_vehicle_for_repair()
@@ -267,10 +317,12 @@ create trigger maintenance_flag_vehicle after insert on public.maintenance_repor
 for each row execute function public.flag_reported_vehicle_for_repair();
 
 -- Security-invoker views keep large ledgers accurate without downloading every row to the browser.
+-- Ikkalasi ham faqat TASDIQLANGAN yozuvlarni hisobga oladi: monitoringdan o'tmagan reys
+-- mijozga qarz yozmaydi, tasdiqlanmagan chiqim esa kassa qoldig'ini kamaytirmaydi.
 create or replace view public.client_balances with (security_invoker = true) as
 select c.id as client_id,
   c.opening_balance
-  + coalesce((select sum(t.total_amount) from public.trips t where t.client_id = c.id and t.sale_type = 'credit'), 0)
+  + coalesce((select sum(t.total_amount) from public.trips t where t.client_id = c.id and t.sale_type = 'credit' and t.monitoring_status = 'approved'), 0)
   - coalesce((select sum(tx.amount) from public.transactions tx where tx.client_id = c.id and tx.direction = 'in' and tx.category = 'customer_payment'), 0)
   as current_balance
 from public.clients c;
@@ -279,6 +331,7 @@ create or replace view public.financial_balances with (security_invoker = true) 
 select payment_method,
   coalesce(sum(case when direction = 'in' then amount else -amount end), 0) as current_balance
 from public.transactions
+where monitoring_status = 'approved'
 group by payment_method;
 
 -- Always calculate a trip's unit price and total on the server, then validate its assigned truck/driver.
@@ -307,33 +360,89 @@ begin
   end if;
   new.unit_price := current_price;
   new.total_amount := round(new.weight_tons * current_price, 2);
+  -- Ikki xil kiritish bor:
+  --   trips.create         → reys monitoring navbatiga tushadi ('pending'), balansga yozilmaydi.
+  --   trips.auto_approve   → reys monitoringdan o'tmaydi, darhol tasdiqlangan ('approved')
+  --                          bo'lib saqlanadi va balansga yoziladi.
+  -- Kirituvchi monitoring_status'ni o'zi yubora olmaydi (INSERT grantida bu ustun yo'q):
+  -- qaror serverda, kirituvchining ruxsati asosida qabul qilinadi. Monitoringdan keyin
+  -- o'zgartirish esa faqat set_trip_monitoring() orqali (RPC) mumkin.
+  if public.has_permission('trips.auto_approve') then
+    new.monitoring_status := 'approved';
+    new.monitored_by := auth.uid();
+    new.monitored_at := now();
+  else
+    new.monitoring_status := 'pending';
+    new.monitored_by := null;
+    new.monitored_at := null;
+  end if;
   return new;
 end;
 $$;
 
 drop trigger if exists trips_prepare_before_insert on public.trips;
 create trigger trips_prepare_before_insert before insert on public.trips
-for each row execute function public.prepare_trip();
+  for each row execute function public.prepare_trip();
 
--- Cash-sale trips immediately increase cash-on-hand; credit trips increase receivables from the client ledger.
-create or replace function public.record_cash_trip_income()
+-- Naqd savdo reysi faqat TASDIQLANGANDAN keyin kassaga yoziladi. Monitoringdan
+-- tasdiqlangan zahoti trigger yozuvni yaratadi, tasdiqlash bekor qilinganda esa
+-- o'zi yaratgan yozuvni olib tashlaydi — shuning uchun kassa hech qachon
+-- "tasdiqlanmagan" reys pulini ko'rsatmaydi. Idempotent: mavjud yozuv qayta
+-- yaratilmaydi (trigger bir necha marta ishga tushsa ham).
+create or replace function public.sync_trip_cash_income()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
 begin
-  if new.sale_type = 'cash' then
-    insert into public.transactions (direction, category, amount, payment_method, client_id, vehicle_id, trip_id, note, created_by, created_at)
-    values ('in', 'cash_sale', new.total_amount, 'cash', new.client_id, new.vehicle_id, new.id, 'Naqd savdo · ' || new.id::text, new.created_by, new.created_at);
+  if new.sale_type = 'cash' and new.monitoring_status = 'approved' then
+    if not exists (
+      select 1 from public.transactions tx
+      where tx.trip_id = new.id and tx.category = 'cash_sale'
+    ) then
+      insert into public.transactions (direction, category, amount, payment_method, client_id, vehicle_id, trip_id, note, created_by, created_at)
+      values ('in', 'cash_sale', new.total_amount, 'cash', new.client_id, new.vehicle_id, new.id, 'Naqd savdo · ' || new.id::text, new.created_by, new.created_at);
+    end if;
+  elsif new.monitoring_status = 'pending' then
+    delete from public.transactions tx where tx.trip_id = new.id and tx.category = 'cash_sale';
   end if;
   return new;
 end;
 $$;
 
+drop trigger if exists trips_sync_cash_income on public.trips;
+create trigger trips_sync_cash_income after insert or update of monitoring_status on public.trips
+  for each row execute function public.sync_trip_cash_income();
+
+-- Eski sxema trigger'i: naqd savdo kassaga DARHOL yozilardi. Uni olib tashlash
+-- shart — aks holda u yangi monitoring qoidasi bilan birga ishlab, tasdiqlanmagan
+-- reys pulini kassaga kiritib yuborardi.
 drop trigger if exists trips_record_cash_income on public.trips;
-create trigger trips_record_cash_income after insert on public.trips
-for each row execute function public.record_cash_trip_income();
+drop function if exists public.record_cash_trip_income();
+
+-- Moliya yozuvlari: chiqim har doim monitoringga tushadi, kirim esa darhol hisobga olinadi.
+-- Kirituvchi monitoring_status'ni yubora olmaydi (grantda bu ustun yo'q), shuning uchun
+-- qiymat faqat shu trigger orqali qo'yiladi.
+create or replace function public.set_transaction_monitoring_default()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.monitoring_status := case when new.direction = 'out' then 'pending' else 'approved' end;
+  new.monitored_by := null;
+  new.monitored_at := case when new.direction = 'out' then null else new.created_at end;
+  return new;
+end;
+$$;
+
+drop trigger if exists transactions_monitoring_default on public.transactions;
+create trigger transactions_monitoring_default before insert on public.transactions
+  for each row execute function public.set_transaction_monitoring_default();
+
+-- ══════════ 04_triggers_monitoring ══════════
 
 -- ── Moliya turlari (daromat / xarajat) ────────────────────────────────────
 -- transactions.category endi qattiq ro'yxatga bog'lanmaydi: tur jadvali orqali
@@ -374,6 +483,9 @@ alter table public.transactions drop constraint if exists customer_payment_clien
 alter table public.transactions drop constraint if exists payroll_driver_check;
 -- drop ... if exists addimida bo'lishi shart: aks holda fayl ikkinchi marta ishga tushganda
 -- 42710 "constraint ... already exists" xatosi chiqadi va skript to'xtaydi.
+
+-- ══════════ 05_categories_guards ══════════
+
 alter table public.transactions drop constraint if exists transactions_category_format_check;
 alter table public.transactions add constraint transactions_category_format_check check (category ~ '^[a-z][a-z0-9_]{1,39}$');
 -- O'zgaruvchan CHECK Postgres'da mumkin emas, shuning uchun trigger ishlatiladi.
@@ -482,6 +594,8 @@ drop trigger if exists transaction_categories_guard_update on public.transaction
 create trigger transaction_categories_guard_update before update on public.transaction_categories
 for each row execute function public.guard_transaction_category_update();
 
+-- ══════════ 06_functions_rbac ══════════
+
 -- ── Dynamic permission check used by RLS and client-side navigation ────────
 -- Earlier revisions declared the argument as p_code, and create or replace cannot rename an
 -- argument (42P13). RLS policies hold a stored reference to the function, so they are dropped
@@ -537,9 +651,15 @@ as $$
   select exists (
     select 1
     from public.users u
-    join public.role_permissions rp on rp.role_id = u.role_id
-    join public.permissions p on p.id = rp.permission_id
-    where u.id = auth.uid() and u.is_active = true and p.key = p_key
+    join public.roles r on r.id = u.role_id
+    -- grants_all roliga yangi kalit avtomatik beriladi; bu shart trigger ishlamagan
+    -- yoki kesh eskirgan holatda ham to'liq huquqni kafolatlaydi.
+    where u.id = auth.uid() and u.is_active = true
+      and (r.grants_all or exists (
+        select 1 from public.role_permissions rp
+        join public.permissions p on p.id = rp.permission_id
+        where rp.role_id = u.role_id and p.key = p_key
+      ))
   );
 $$;
 
@@ -556,14 +676,17 @@ security definer
 set search_path = public
 as $$
   -- Katalog bo'sh bo'lsa hech kim to'liq dostubga ega emas (aksi holda trigger har yozuvni
-  -- superadmin qilib qo'yardi).
-  select exists (select 1 from public.permissions)
-     and not exists (
-       select 1
-       from public.permissions p
-       where not exists (
-         select 1 from public.role_permissions rp
-         where rp.role_id = p_role_id and rp.permission_id = p.id
+  -- superadmin qilib qo'yardi). `grants_all` belgilangan lavozim esa doim to'liq huquqli.
+  select coalesce((select r.grants_all from public.roles r where r.id = p_role_id), false)
+     or (
+       exists (select 1 from public.permissions)
+       and not exists (
+         select 1
+         from public.permissions p
+         where not exists (
+           select 1 from public.role_permissions rp
+           where rp.role_id = p_role_id and rp.permission_id = p.id
+         )
        )
      );
 $$;
@@ -638,6 +761,75 @@ create trigger role_permissions_sync_superadmins
   after insert or delete on public.role_permissions
   for each row execute function public.sync_role_superadmins();
 
+-- Yangi ruxsat kaliti katalogga qo'shilganda uni `grants_all` lavozimlarga darhol beramiz.
+-- Aynan shu trigger "superadmin yangi kalitni qo'lda o'ziga qo'shishi kerak" muammosini
+-- ildizidan hal qiladi: endi yangi kalit qo'shilsa, to'liq huquqli lavozim o'z-o'zidan oladi.
+create or replace function public.sync_permission_to_full_access_roles()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.role_permissions (role_id, permission_id)
+  select r.id, new.id from public.roles r where r.grants_all
+  on conflict do nothing;
+  return null;
+end;
+$$;
+drop trigger if exists permissions_grant_full_access on public.permissions;
+create trigger permissions_grant_full_access
+  after insert on public.permissions
+  for each row execute function public.sync_permission_to_full_access_roles();
+
+-- Lavozim `grants_all` deb belgilansa (yoki yangi ruxsatlar qo'shilgan bo'lsa), mavjud
+-- barcha kalitlarni darhol beramiz. Belgi olib tashlansa, ruxsatlar qoladi — ular
+-- lavozimlar orqali qo'lda boshqariladi.
+create or replace function public.sync_role_grants_all()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.grants_all then
+    insert into public.role_permissions (role_id, permission_id)
+    select new.id, p.id from public.permissions p
+    on conflict do nothing;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists roles_sync_grants_all on public.roles;
+create trigger roles_sync_grants_all
+  after insert or update of grants_all on public.roles
+  for each row execute function public.sync_role_grants_all();
+
+-- Faqat superadmin lavozimning "barcha ruxsatlar avtomatik" belgisini boshqaradi.
+create or replace function public.set_role_grants_all(p_role_id uuid, p_grants_all boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_superadmin() then
+    raise exception 'Ruxsat berilmagan: faqat superadmin lavozimlarni boshqaradi.' using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.roles where id = p_role_id) then
+    raise exception 'Lavozim topilmadi.' using errcode = 'P0002';
+  end if;
+  if p_grants_all = false
+     and exists (select 1 from public.users u where u.id = auth.uid() and u.role_id = p_role_id)
+  then
+    raise exception 'O‘z lavozimingizdan to‘liq huquqni olib tashlay olmaysiz.' using errcode = '42501';
+  end if;
+  update public.roles set grants_all = p_grants_all where id = p_role_id;
+end;
+$$;
+revoke all on function public.set_role_grants_all(uuid, boolean) from public;
+grant execute on function public.set_role_grants_all(uuid, boolean) to authenticated;
+
 -- Xodimlar ro'yxati (ism, login, telefon, lavozim) — ismlar jamiada ko'rinishi uchun
 -- ochiq, ammo reys stavkasi faqat o'z egasi va xodimlar bo'limiga ko'rinadi.
 -- View ataylab security definer (standart) qilingan: public.users dagi RLS bu yerda
@@ -679,6 +871,56 @@ begin
   if not found then raise exception 'Haydovchi profili topilmadi.' using errcode = 'P0002'; end if;
 end;
 $$;
+
+-- ══════════ 07_monitoring_rpcs ══════════
+
+-- ── Monitoring: tasdiqlash / tasdiqlashni bekor qilish ──────────────────────
+-- Ikki alohida RPC — ikkalasi ham `monitoring.approve` ruxsatini tekshiradi va
+-- SECURITY DEFINER bilan ishlaydi, shuning uchun brauzer to'g'ridan-to'g'ri
+-- monitoring_status ni o'zgartira olmaydi: uni faqat monitoring bo'limidagi
+-- shu tugmalar o'zgartiradi. Narx/ta'sir (kassa yozuvi, mijoz balansi) triggerlar
+-- orqali avtomatik qayta hisoblanadi.
+create or replace function public.set_trip_monitoring(p_trip_id uuid, p_approved boolean, p_note text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.has_permission('monitoring.approve') then
+    raise exception 'Tasdiqlash huquqi yo‘q.' using errcode = '42501';
+  end if;
+  update public.trips t set
+    monitoring_status = case when p_approved then 'approved' else 'pending' end,
+    monitored_by = auth.uid(),
+    monitored_at = now(),
+    monitoring_note = nullif(btrim(coalesce(p_note, '')), '')
+  where t.id = p_trip_id;
+  if not found then raise exception 'Reys topilmadi.' using errcode = 'P0002'; end if;
+end;
+$$;
+
+create or replace function public.set_expense_monitoring(p_transaction_id uuid, p_approved boolean, p_note text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.has_permission('monitoring.approve') then
+    raise exception 'Tasdiqlash huquqi yo‘q.' using errcode = '42501';
+  end if;
+  update public.transactions tx set
+    monitoring_status = case when p_approved then 'approved' else 'pending' end,
+    monitored_by = auth.uid(),
+    monitored_at = now(),
+    monitoring_note = nullif(btrim(coalesce(p_note, '')), '')
+  where tx.id = p_transaction_id and tx.direction = 'out';
+  if not found then raise exception 'Xarajat yozuvi topilmadi.' using errcode = 'P0002'; end if;
+end;
+$$;
+
+-- ══════════ 08_phone_profile ══════════
 
 -- ── Telefon raqami: bitta kanonik shakl ─────────────────────────────────────
 -- Frontend har doim "+998 90 123 45 67" shaklida saqlaydi, lekin himoya serverda
@@ -850,12 +1092,24 @@ as $$
 declare
   wanted text[] := coalesce(p_permission_keys, '{}'::text[]);
   rejected text[];
+  role_grants_all boolean;
 begin
   if not public.is_superadmin() then
     raise exception 'Ruxsat berilmagan: faqat superadmin lavozim va ruxsatlarni boshqaradi.' using errcode = '42501';
   end if;
-  if not exists (select 1 from public.roles where id = p_role_id) then
+  select grants_all into role_grants_all from public.roles where id = p_role_id;
+  if not found then
     raise exception 'Lavozim topilmadi.' using errcode = 'P0002';
+  end if;
+  -- "Barcha ruxsatlar avtomatik" lavozimda kalitni olib tashlab bo'lmaydi: aks holda
+  -- u yangi kalitlarni olsa ham eski kalitlardan ayrilib, to'liq huquqdan chiqib ketardi.
+  if role_grants_all then
+    select array_agg(p.key) into rejected
+    from public.permissions p where not (p.key = any (wanted));
+    if rejected is not null then
+      raise exception 'Bu lavozim «barcha ruxsatlar avtomatik» — undan ruxsat olib tashlab bo‘lmaydi.' using errcode = '42501';
+    end if;
+    return;
   end if;
   select array_agg(requested.key) into rejected
   from unnest(wanted) as requested(key)
@@ -893,6 +1147,12 @@ revoke all on function public.save_role_permissions(uuid, text[]) from public;
 grant execute on function public.save_role_permissions(uuid, text[]) to authenticated;
 revoke all on function public.set_driver_rate(uuid, numeric) from public;
 grant execute on function public.set_driver_rate(uuid, numeric) to authenticated;
+revoke all on function public.set_trip_monitoring(uuid, boolean, text) from public;
+grant execute on function public.set_trip_monitoring(uuid, boolean, text) to authenticated;
+revoke all on function public.set_expense_monitoring(uuid, boolean, text) from public;
+grant execute on function public.set_expense_monitoring(uuid, boolean, text) to authenticated;
+
+-- ══════════ 09_policies_storage_realtime ══════════
 
 -- ── Row-level security ────────────────────────────────────────────────────
 alter table public.roles enable row level security;
@@ -985,11 +1245,14 @@ drop policy if exists vehicles_insert_manage on public.vehicles;
 create policy vehicles_insert_manage on public.vehicles for insert to authenticated with check (public.has_permission('fleet.manage'));
 
 -- Managers see operational data; drivers see only their assigned trip rows.
+-- monitoring.view / monitoring.approve egalari reyslarni Monitoring bo'limida
+-- ko'rish (va tasdiqlash) uchun kirishadi.
 drop policy if exists trips_read on public.trips;
 create policy trips_read on public.trips for select to authenticated using (
   public.has_permission('trips.view') or public.has_permission('clients.view') or public.has_permission('dashboard.view') or
+  public.has_permission('monitoring.view') or public.has_permission('monitoring.approve') or
   (public.has_permission('trips.create') and created_by = auth.uid()) or
-  (public.has_permission('driver.self') and driver_id = auth.uid())
+  (public.has_permission('driver.self') and (driver_id = auth.uid() or created_by = auth.uid()))
 );
 drop policy if exists trips_insert on public.trips;
 create policy trips_insert on public.trips for insert to authenticated with check (
@@ -997,18 +1260,23 @@ create policy trips_insert on public.trips for insert to authenticated with chec
   exists (select 1 from public.vehicles v where v.id = vehicle_id and v.driver_id = driver_id and v.status = 'active')
 );
 -- Only the photo path may be changed after the initial insert (the app uploads after creating the trip row).
+-- Monitoring holati esa faqat set_trip_monitoring() orqali o'zgaradi — bu policy
+-- monitoring_status ustuniga grant yo'qligi bilan ham himoyalangan.
 drop policy if exists trips_attach_photo on public.trips;
 create policy trips_attach_photo on public.trips for update to authenticated
-using (public.has_permission('trips.create') and created_by = auth.uid())
-with check (public.has_permission('trips.create') and created_by = auth.uid());
+  using (public.has_permission('trips.create') and created_by = auth.uid())
+  with check (public.has_permission('trips.create') and created_by = auth.uid());
 
 -- Cashier users cannot create arbitrary income/expense categories.
+-- monitoring.view / monitoring.approve egalari Monitoring bo'limi uchun chiqimlarni
+-- ko'ra (va tasdiqla) oladi.
 drop policy if exists transactions_read on public.transactions;
 create policy transactions_read on public.transactions for select to authenticated using (
   public.has_permission('finance.view') or public.has_permission('dashboard.view') or
+  public.has_permission('monitoring.view') or public.has_permission('monitoring.approve') or
   (public.has_permission('clients.view') and category = 'customer_payment' and client_id is not null) or
   ((public.has_permission('finance.payments.create') or public.has_permission('finance.expenses.create')) and created_by = auth.uid()) or
-  (public.has_permission('driver.self') and driver_id = auth.uid())
+  (public.has_permission('driver.self') and (driver_id = auth.uid() or created_by = auth.uid()))
 );
 -- Faqat faol va yo‘nalishiga mos turlar kiritiladi. Yangi daromat/xarajat turlari
 -- Sozlamalar → Moliya bo‘limida yaratilgach shu yerda avtomatik qo‘llanadi;
@@ -1108,9 +1376,18 @@ grant update (unit_price, is_active) on public.materials to authenticated;
 grant delete on public.materials to authenticated;
 grant select on public.vehicles to authenticated;
 grant update (plate, model, year, status, driver_id) on public.vehicles to authenticated;
-grant select, insert on public.trips to authenticated;
+grant select on public.trips to authenticated;
+-- trips insert — USTUN darajasida. unit_price va total_amount serverda trigger
+-- hisoblaydi, monitoring_status esa monitoringdan tasdiqlanadi: shu uchun bu
+-- ustunlarga grant berilmaydi va brauzer ularni yubora olmaydi.
+revoke insert on public.trips from authenticated;
+grant insert (id, vehicle_id, driver_id, client_id, material_id, weight_tons, sale_type, hours_worked, note, created_by) on public.trips to authenticated;
 grant update (photo_path) on public.trips to authenticated;
-grant select, insert on public.transactions to authenticated;
+grant select on public.transactions to authenticated;
+-- Xuddi shu sabab: monitoring_status, monitored_by, monitored_at va monitoring_note
+-- faqat set_expense_monitoring() RPC'si orqali o'zgaradi.
+revoke insert on public.transactions from authenticated;
+grant insert (direction, category, amount, payment_method, client_id, vehicle_id, driver_id, note) on public.transactions to authenticated;
 grant select, insert, update, delete on public.transaction_categories to authenticated;
 grant select on public.client_balances, public.financial_balances to authenticated;
 grant select, insert on public.maintenance_reports to authenticated;
@@ -1120,6 +1397,10 @@ grant update (status, resolved_at) on public.maintenance_reports to authenticate
 -- Triggerlar faqat keyingi o'zgarishlarda ishlaydi; shuning uchun mavjud xodimlar uchun
 -- bir marta to'liq qayta hisoblaymiz. Shu bilan eng muhimi: yangi ruxsat kaliti qo'shilsa
 -- yoki "Boshliq"ga biror ruxsat berilsa, o'sha lavozimdagi xodimlar superadmin bo'lib qoladi.
+-- ESDA: monitoring.* va materials.prices.view kalitlari faqat "Boshliq"ga beriladi
+-- (yuqoridagi cross join shuni avtomatik qiladi). Agar boshqa bir lavozim oldindan
+-- BARCHA kalitlarga ega bo'lgan bo'lsa, u endi to'liq dostub hisoblanmaydi — bu kutilgan
+-- xatti-harakat: monitoring huquqi qo'lda berilishi kerak.
 update public.users u
 set is_superadmin = public.role_has_full_access(u.role_id)
 where u.is_superadmin is distinct from public.role_has_full_access(u.role_id);

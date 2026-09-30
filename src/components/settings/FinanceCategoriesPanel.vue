@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { Plus, Pencil, Trash2, ArrowDownLeft, ArrowUpRight, LockKeyhole, WalletCards } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, ArrowDownLeft, ArrowUpRight, LockKeyhole } from 'lucide-vue-next'
 import ModalDialog from '../ModalDialog.vue'
 import TransactionCategoryForm from '../forms/TransactionCategoryForm.vue'
 import { useQuarryStore } from '../../stores/quarry'
@@ -101,25 +101,9 @@ async function remove(category) {
       </section>
     </div>
 
-    <div v-if="!canManage" class="flex items-start gap-3 rounded-2xl border border-[#d8e4f5] bg-[#f4f8ff] p-4">
-      <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><LockKeyhole :size="17" /></div>
-      <div>
-        <p class="text-xs font-bold text-forest">Faqat qo‘shish ruxsati</p>          <p class="mt-1 text-[11px] leading-5 text-[#5b7295]">Yangi turi mustaqil yarata olasiz; tahrirlash va o‘chirish uchun “Moliya turlarini boshqarish” ruxsati kerak.</p>
-      </div>
-    </div>
-
-    <div class="flex items-start gap-3 rounded-2xl border border-[#d8e4f5] bg-[#f4f8ff] p-4">
-      <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-leaf"><WalletCards :size="17" /></div>
-      <div>
-        <p class="text-xs font-bold text-forest">Xavfsizlik qoidasi</p>
-        <p class="mt-1 text-[11px] leading-5 text-[#5b7295]">Tizim turlari (Naqd savdo, Mijoz to‘lovi, Yoqilg‘i va h.k.) o‘chirilmaydi; yaratilgan turi reys yoki to‘lovda ishlatilgan bo‘lsa, bazada bloklanadi.</p>
-      </div>
-    </div>
-
     <ModalDialog
       v-model="showEditor"
       :title="editing ? 'Moliya turini tahrirlash' : 'Yangi moliya turi'"
-      description="Bu turlar Moliya sahifasidagi kirim va chiqim formlarida paydo bo‘ladi."
       width="max-w-xl"
     >
       <TransactionCategoryForm
