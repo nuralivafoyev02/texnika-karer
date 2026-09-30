@@ -166,6 +166,7 @@ export const GUIDE_SECTIONS = [
       'Jadvalni CSV faylga eksport qilish',
       'Har bir kirim va chiqimga izoh yozish — jurnalda «Tafsilot» sifatida ko‘rinadi',
       'Chiqim qatoridagi monitoring holati (kutilmoqda / tasdiqlangan)',
+      'Kvitansiyani tahrirlash va o‘chirish (ruxsat berilgan bo‘lsa)',
     ],
     steps: [
       'To‘lov uchun «To‘lov kiritish»: tur, mijoz, summa, usul.',

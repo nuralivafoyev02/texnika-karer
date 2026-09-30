@@ -35,6 +35,7 @@ const writeRemoteCache = (userId, snapshot) => {
 // eski nusxasi ko'rsatiladi — ya'ni "saqlandi, lekin jurnalda yo'q" holati chiqadi.
 const REMOTE_MUTATING_ACTIONS = new Set([
   'createTrip', 'createPayment', 'createExpense', 'setTripMonitoring', 'setExpenseMonitoring',
+  'updateTransaction', 'deleteTransaction',
   'createClient', 'createStaff', 'updateStaffProfile', 'setStaffPassword', 'updateMyProfile',
   'saveRole', 'deleteRole', 'createMaterial', 'updateMaterial', 'deleteMaterial',
   'createCategory', 'updateCategory', 'deleteCategory', 'createVehicle', 'updateVehicle',
@@ -45,6 +46,7 @@ const clearRemoteCache = (userId) => {
   if (!userId || typeof localStorage === 'undefined') return
   try { localStorage.removeItem(remoteCacheKey(userId)) } catch { /* o'chirib bo'lmasa ham asosiy oqim buzilmaydi */ }
 }
+const TX_SCHEMA_HINT = 'Bazada kvitansiya tahrirlash funksiyasi yo‘q: supabase/migrations/12_transaction_edit_delete.sql faylini SQL Editor’da ishga tushiring.'
 const makeId = (prefix = 'ID') => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2, 11)}`
 // UUID v4 — `crypto.randomUUID()` faqat XAVFSIZ KONTEKSTDA (https yoki localhost)
 // mavjud. Ilova ichki tarmoq IP si yoki http manzil orqali ochilsa u `undefined`
@@ -159,7 +161,7 @@ const mapTransaction = (row) => ({
   id: row.id, direction: row.direction, category: row.category, amount: Number(row.amount ?? 0),
   paymentMethod: row.payment_method ?? 'cash', clientId: row.client_id ?? null,
   driverId: row.driver_id ?? null, vehicleId: row.vehicle_id ?? null, tripId: row.trip_id ?? null,
-  note: row.note ?? '', createdAt: row.created_at,
+  note: row.note ?? '', createdAt: row.created_at, createdBy: row.created_by ?? null,
   monitoringStatus: monitoringStatusOf(row), monitoredAt: row.monitored_at ?? null,
   monitoringNote: row.monitoring_note ?? '', monitoredBy: row.monitored_by ?? null,
 })
@@ -280,6 +282,13 @@ export const useQuarryStore = defineStore('quarry', {
     // Reys va xarajatlarni tasdiqlash / tasdiqlashni bekor qilish.
     canApproveMonitoring() {
       return this.can('monitoring.approve')
+    },
+    // Kvitansiyalarni (kirim/chiqim yozuvlarini) tahrirlash va o'chirish.
+    canEditTransactions() {
+      return this.can('finance.transactions.edit')
+    },
+    canDeleteTransactions() {
+      return this.can('finance.transactions.delete')
     },
     // Narx (tonna narxi, reys qiymati) ko'rinishi: materials.prices.view yoki moliyani
     // ko'rish huquqi. Haydovchi va tarozi ustasi bu ikkalasiga ham ega emas — ular faqat
@@ -426,6 +435,10 @@ export const useQuarryStore = defineStore('quarry', {
       // mijoz jurnalda qoladi (balansga esa faqat credit reyslar ta'sir qiladi).
       if (trip.clientId) return this.clients.find((client) => client.id === trip.clientId)?.name ?? 'Noma’lum mijoz'
       return trip.saleType === 'cash' ? 'Naqd savdo' : 'Mijozsiz'
+    },
+    // Reysga bog'langan yozuv (naqd savdo) reys monitoringi orqali boshqariladi.
+    transactionLocked(tx) {
+      return Boolean(tx?.tripId) || tx?.category === 'cash_sale'
     },
     hasPhoto(trip) {
       return this.remoteMode ? Boolean(trip.photoPath) : Boolean(trip.photoUrl)
@@ -951,9 +964,17 @@ export const useQuarryStore = defineStore('quarry', {
           channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions' }, (payload) => {
             const existing = this.transactions.find((item) => item.id === payload.new.id)
             if (!existing) return
-            const wasPending = isPending(existing)
+            const before = [isPending(existing), existing.amount, existing.paymentMethod, existing.category, existing.clientId].join('|')
             Object.assign(existing, mapTransaction(payload.new))
-            if (wasPending !== isPending(existing)) this.refreshLedgerBalances()
+            const after = [isPending(existing), existing.amount, existing.paymentMethod, existing.category, existing.clientId].join('|')
+            if (before !== after) this.refreshLedgerBalances()
+          })
+          // Kvitansiya boshqa qurilmada o'chirilganda ham jadvaldan olib tashlanadi.
+          channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'transactions' }, (payload) => {
+            const index = this.transactions.findIndex((item) => item.id === payload.old?.id)
+            if (index === -1) return
+            this.transactions.splice(index, 1)
+            this.refreshLedgerBalances()
           })
         }
         if (can('trips.view') || can('trips.create') || can('clients.view') || can('dashboard.view') || can('driver.self') || can('monitoring.view') || can('monitoring.approve')) {
@@ -1058,9 +1079,10 @@ export const useQuarryStore = defineStore('quarry', {
         id, vehicleId: vehicle.id, driverId: vehicle.driverId, clientId,
         materialId: material.id, weightTons: weight, unitPrice: material.unitPrice, totalAmount: total,
         saleType: payload.saleType, hoursWorked: Number(payload.hoursWorked || 0), photoUrl: await readDataUrl(payload.photoFile),
-        photoName: payload.photoFile?.name ?? '', note, createdBy: this.activeUserId,
+        photoName: payload.photoFile?.name ?? '', note, createdAt, createdBy: this.activeUserId,
         monitoringStatus: this.canAutoApproveTrips ? 'approved' : 'pending',
-        monitoredAt: this.canAutoApproveTrips ? createdAt : null, monitoredNote: '',
+        monitoredAt: this.canAutoApproveTrips ? createdAt : null,
+        monitoredBy: this.canAutoApproveTrips ? this.activeUserId : null, monitoringNote: '',
       }
       this.trips.unshift(trip)
       // Naqd savdo tushumi faqat tasdiqlashdan keyin kassaga tushadi (syncDemoTripCash).
@@ -1093,7 +1115,7 @@ export const useQuarryStore = defineStore('quarry', {
       } else {
         this.transactions.unshift({ id: makeId('TX'), direction: 'in', category: categoryKey, amount,
           paymentMethod: payload.paymentMethod, clientId: needsClient ? payload.clientId : null, driverId: null, vehicleId: null,
-          note: payload.note?.trim() || '', createdAt: new Date().toISOString(), monitoringStatus: 'approved' })
+          note: payload.note?.trim() || '', createdAt: new Date().toISOString(), createdBy: this.activeUserId, monitoringStatus: 'approved' })
         this.persistDemo()
       }
       this.notify('Mijoz to‘lovi hisobga olindi.')
@@ -1116,7 +1138,7 @@ export const useQuarryStore = defineStore('quarry', {
         this.transactions.unshift({ id: makeId('TX'), direction: 'out', category: payload.category, amount,
           paymentMethod: payload.paymentMethod, clientId: null, driverId: payload.driverId || null,
           vehicleId: payload.vehicleId || null, note: payload.note?.trim() || '', createdAt: new Date().toISOString(),
-          monitoringStatus: 'pending', monitoredAt: null, monitoringNote: '' })
+          createdBy: this.activeUserId, monitoringStatus: 'pending', monitoredAt: null, monitoringNote: '' })
         this.persistDemo()
       }
       this.notify('Xarajat saqlandi va monitoringga yuborildi — tasdiqlashdan keyin kassadan hisobga olinadi.')
@@ -1200,6 +1222,74 @@ export const useQuarryStore = defineStore('quarry', {
       this.notify(approved
         ? 'Xarajat tasdiqlandi — kassadan hisobga olindi.'
         : 'Tasdiqlash bekor qilindi — xarajat yana kutilmoqda.')
+    },
+    // ── Kvitansiyani tahrirlash / o'chirish ─────────────────────────────────
+    // Serverda update_transaction / delete_transaction RPC'lari ruxsatni tekshiradi.
+    // Tasdiqlangan chiqimning summasi, hisobi yoki turi o'zgarsa va tahrirlovchida
+    // tasdiqlash huquqi bo'lmasa — yozuv qayta monitoringga tushadi.
+    async updateTransaction(transactionId, payload) {
+      if (!this.canEditTransactions) throw new Error('Kvitansiyani tahrirlash ruxsati yo‘q.')
+      const transaction = this.transactions.find((item) => item.id === transactionId)
+      if (!transaction) throw new Error('Kvitansiya topilmadi.')
+      if (this.transactionLocked(transaction)) throw new Error('Reysga bog‘langan yozuv reys orqali boshqariladi.')
+      const amount = Number(payload.amount)
+      if (!(amount > 0)) throw new Error('Summa 0 dan katta bo‘lishi kerak.')
+      const category = payload.category || transaction.category
+      const definition = this.categories.find((item) => item.key === category)
+      if (definition && definition.direction !== transaction.direction) throw new Error('Tanlangan tur bu yozuv yo‘nalishiga mos emas.')
+      const wasPending = isPending(transaction)
+      const isIn = transaction.direction === 'in'
+      const needsClient = isIn && (definition ? definition.needsClient : category === 'customer_payment')
+      if (needsClient && !payload.clientId) throw new Error('Mijozni tanlang.')
+      if (!isIn && definition?.needsDriver && !payload.driverId) throw new Error('Haydovchini tanlang.')
+      const next = {
+        category, amount,
+        paymentMethod: payload.paymentMethod === 'bank' ? 'bank' : 'cash',
+        clientId: isIn ? (needsClient ? payload.clientId : null) : transaction.clientId,
+        vehicleId: isIn ? transaction.vehicleId : (payload.vehicleId || null),
+        driverId: isIn ? transaction.driverId : (payload.driverId || null),
+        note: payload.note?.trim() || '',
+      }
+      if (this.remoteMode) {
+        const { error } = await supabase.rpc('update_transaction', {
+          p_transaction_id: transactionId, p_category: next.category, p_amount: next.amount,
+          p_payment_method: next.paymentMethod, p_client_id: next.clientId, p_vehicle_id: next.vehicleId,
+          p_driver_id: next.driverId, p_note: next.note || null,
+        })
+        if (error) throw new Error(error.code === 'PGRST202' ? TX_SCHEMA_HINT : readableDbError(error, 'Kvitansiyani saqlab bo‘lmadi.'))
+        const { data, error: readError } = await supabase.from('transactions').select('*').eq('id', transactionId).single()
+        if (readError) throw new Error(readableDbError(readError, 'Kvitansiyani yangilab bo‘lmadi.'))
+        Object.assign(transaction, mapTransaction(data))
+        await this.refreshLedgerBalances()
+      } else {
+        const financialChange = next.amount !== Number(transaction.amount) || next.paymentMethod !== transaction.paymentMethod || next.category !== transaction.category
+        Object.assign(transaction, next)
+        if (transaction.direction === 'out' && financialChange && !this.canApproveMonitoring) {
+          Object.assign(transaction, { monitoringStatus: 'pending', monitoredAt: null, monitoredBy: null, monitoringNote: '' })
+        }
+        this.persistDemo()
+      }
+      this.notify(!wasPending && isPending(transaction)
+        ? 'Kvitansiya yangilandi va qayta monitoringga yuborildi.'
+        : 'Kvitansiya yangilandi.')
+      return transaction
+    },
+    async deleteTransaction(transactionId) {
+      if (!this.canDeleteTransactions) throw new Error('Kvitansiyani o‘chirish ruxsati yo‘q.')
+      const index = this.transactions.findIndex((item) => item.id === transactionId)
+      if (index === -1) throw new Error('Kvitansiya topilmadi.')
+      if (this.transactionLocked(this.transactions[index])) throw new Error('Reysga bog‘langan yozuv reys orqali boshqariladi.')
+      if (this.remoteMode) {
+        const { error } = await supabase.rpc('delete_transaction', { p_transaction_id: transactionId })
+        if (error) throw new Error(error.code === 'PGRST202' ? TX_SCHEMA_HINT : readableDbError(error, 'Kvitansiyani o‘chirib bo‘lmadi.'))
+        const current = this.transactions.findIndex((item) => item.id === transactionId)
+        if (current !== -1) this.transactions.splice(current, 1)
+        await this.refreshLedgerBalances()
+      } else {
+        this.transactions.splice(index, 1)
+        this.persistDemo()
+      }
+      this.notify('Kvitansiya o‘chirildi.')
     },
     async createClient(payload) {
       const row = { name: payload.name.trim(), phone: formatPhone(payload.phone) || null, contact_name: payload.contactName?.trim() || null, opening_balance: Number(payload.openingBalance || 0) }

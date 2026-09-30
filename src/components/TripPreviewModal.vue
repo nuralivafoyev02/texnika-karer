@@ -1,10 +1,12 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { Truck, UserRound, Weight, Clock3, Boxes, CalendarClock, WalletCards, Image as ImageIcon, StickyNote } from 'lucide-vue-next'
+import { computed, ref, watch } from 'vue'
+import { Weight, Clock3, Coins, StickyNote, ImageOff, FileDown, Image as ImageIcon, EyeOff } from 'lucide-vue-next'
 import ModalDialog from './ModalDialog.vue'
+import PreviewSection from './PreviewSection.vue'
+import DropdownMenu from './DropdownMenu.vue'
 import { useQuarryStore } from '../stores/quarry'
-import { dateTime, money, number, displayId } from '../lib/format'
-import { isAutoApproved, isPendingMonitoring, monitoringLabel } from '../lib/monitoring'
+import { dateTime, money, number, displayId, tripCode } from '../lib/format'
+import { isAutoApproved, isPendingMonitoring, monitoringLabel, monitoringTagClass } from '../lib/monitoring'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -13,110 +15,134 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 const store = useQuarryStore()
 
-// Fotosurat modal ichida ochiladi: tashqi handler yozmaslik uchun
-// preview o'zi rasmni yuklaydi (remote rejida — signed URL oladi).
+// Fotosurat faqat "Rasmni ko'rish" bosilganda yuklanadi (remote rejimda — signed URL).
 const photoOpen = ref(false)
 const photoLoading = ref(false)
 const photoError = ref('')
-async function togglePhoto() {
-  if (photoOpen.value) { photoOpen.value = false; return }
+async function showPhoto() {
+  const trip = props.trip
+  if (!trip) return
   photoOpen.value = true
   photoError.value = ''
-  const trip = props.trip
-  if (!trip || trip.photoUrl || !store.remoteMode) return
+  if (trip.photoUrl || !store.remoteMode) return
   photoLoading.value = true
   try {
-    if (!await store.ensurePhotoUrl(trip)) photoError.value = 'Rasmni yuklab bo‘lmadi. RLS ruxsatini tekshiring.'
+    if (!await store.ensurePhotoUrl(trip)) photoError.value = 'Rasmni yuklab bo‘lmadi.'
   } catch (error) {
     photoError.value = error.message || 'Rasmni yuklab bo‘lmadi.'
   } finally { photoLoading.value = false }
 }
+// Boshqa reys ochilganda yoki oyna yopilganda rasm yana yashiriladi.
+watch(() => [props.modelValue, props.trip?.id], () => { photoOpen.value = false; photoError.value = '' })
+
+// ── Uch nuqtali menyu: reys varaqasini PDF qilib yuklab olish ──────────────
+const downloading = ref(false)
+async function downloadPdf() {
+  if (!props.trip || downloading.value) return
+  downloading.value = true
+  try {
+    const { downloadTripPdf } = await import('../lib/tripPdf')
+    await downloadTripPdf(props.trip, store)
+    store.notify('Reys varaqasi yuklab olindi.')
+  } catch (error) {
+    store.notify(error?.message || 'PDF tayyorlab bo‘lmadi.', 'error')
+  } finally { downloading.value = false }
+}
+const menuItems = computed(() => [{ label: 'Yuklab olish (PDF)', icon: FileDown, action: downloadPdf }])
 
 const vehicle = computed(() => store.vehicles.find((item) => item.id === props.trip?.vehicleId))
+const userName = (id) => (id ? store.users.find((user) => user.id === id)?.fullName ?? '' : '')
 
-// Asosiy tafsilotlar: qiymat faqat ruxsati bor xodimga ko'rinadi.
-const details = computed(() => {
+const stats = computed(() => {
   const trip = props.trip
   if (!trip) return []
-  const rows = [
-    { icon: CalendarClock, label: 'Sana va vaqt', value: dateTime(trip.createdAt) },
-    { icon: Truck, label: 'Texnika', value: store.vehicleName(trip.vehicleId) },
-    { icon: UserRound, label: 'Haydovchi', value: store.driverName(trip.driverId) },
-    { icon: Boxes, label: 'Tosh turi', value: store.materialName(trip.materialId) },
-    { icon: WalletCards, label: 'Mijoz', value: store.tripClient(trip) },
-    { icon: Weight, label: 'Og‘irlik', value: `${number(trip.weightTons, 1)} t` },
-    { icon: Clock3, label: 'Ishlangan vaqt', value: `${number(trip.hoursWorked, 1)} soat` },
-  ]
-  if (store.canSeePrices) {
-    rows.push({ icon: WalletCards, label: 'Tonna narxi', value: money(trip.unitPrice) })
-    rows.push({ icon: WalletCards, label: 'Reys qiymati', value: money(trip.totalAmount) })
-  }
+  const rows = [{ icon: Weight, label: 'Og‘irlik', value: `${number(trip.weightTons, 1)} t` }]
+  if (store.canSeePrices) rows.push({ icon: Coins, label: 'Reys qiymati', value: money(trip.totalAmount), sub: `${money(trip.unitPrice)} / t` })
+  rows.push({ icon: Clock3, label: 'Ish vaqti', value: `${number(trip.hoursWorked, 1)} soat` })
   return rows
+})
+
+const cargoRows = computed(() => {
+  const trip = props.trip
+  if (!trip) return []
+  return [
+    { label: 'Tosh turi', value: store.materialName(trip.materialId) },
+    { label: 'Samosval', value: vehicle.value?.plate || '—', sub: vehicle.value?.model },
+    { label: 'Haydovchi', value: store.driverName(trip.driverId) },
+  ]
+})
+const saleRows = computed(() => {
+  const trip = props.trip
+  if (!trip) return []
+  return [
+    { label: 'Mijoz', value: store.tripClient(trip) },
+    { label: 'Savdo turi', value: trip.saleType === 'cash' ? 'Naqd savdo' : 'Qarzga', tag: trip.saleType === 'cash' ? 'tag-cash' : 'tag-credit' },
+    { label: 'Kiritildi', value: dateTime(trip.createdAt), sub: userName(trip.createdBy) },
+  ]
+})
+const monitoringRows = computed(() => {
+  const trip = props.trip
+  if (!trip) return []
+  return [
+    { label: 'Holat', value: isAutoApproved(trip) ? 'Avto tasdiqlangan' : monitoringLabel(trip), tag: monitoringTagClass(trip) },
+    { label: isPendingMonitoring(trip) ? 'Bekor qilgan' : 'Tasdiqlagan', value: trip.monitoredAt && !isAutoApproved(trip) ? userName(trip.monitoredBy) || '—' : '', sub: trip.monitoredAt && !isAutoApproved(trip) ? dateTime(trip.monitoredAt) : '' },
+    { label: 'Izoh', value: trip.monitoringNote },
+  ]
 })
 </script>
 
 <template>
   <ModalDialog
     :model-value="modelValue"
-    title="Reys tafsiloti"
-    :description="trip ? `${dateTime(trip.createdAt)} · ${store.materialName(trip.materialId)}` : ''"
+    :title="trip ? `Reys ${tripCode(trip.id)}` : 'Reys'"
+    :description="trip ? dateTime(trip.createdAt) : ''"
     width="max-w-2xl"
     @update:model-value="(value) => emit('update:modelValue', value)"
   >
+    <template #actions>
+      <DropdownMenu v-if="trip" :items="menuItems" :busy="downloading" label="Amallar" />
+    </template>
     <div v-if="trip" class="space-y-4">
-      <!-- Yuqori blok: og'irlik va holatlar -->
-      <div class="overflow-hidden rounded-2xl bg-[#0a4fa8] p-5 text-white">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div class="min-w-0">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-white/55">Yuk og‘irligi</p>
-            <p class="mt-1 text-3xl font-bold tracking-tight">{{ number(trip.weightTons, 1) }} <span class="text-base font-semibold text-white/70">tonna</span></p>
-            <p class="mt-1.5 flex items-center gap-1.5 text-xs text-white/75"><Truck :size="14" /> {{ vehicle?.plate || '—' }}<span v-if="vehicle?.model" class="text-white/55">· {{ vehicle.model }}</span></p>
-          </div>
-          <div class="flex flex-col items-end gap-2">
-            <span class="rounded-lg bg-white/15 px-2.5 py-1 text-[10px] font-bold">{{ trip.saleType === 'cash' ? 'Naqd savdo' : 'Hisobga (qarzga)' }}</span>
-            <span class="rounded-lg px-2.5 py-1 text-[10px] font-bold" :class="isPendingMonitoring(trip) ? 'bg-[#ffefcf] text-[#764b16]' : 'bg-white/15 text-white'">{{ monitoringLabel(trip) }}</span>
-          </div>
-        </div>
-        <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-white/15 pt-3 text-[10px] text-white/70">
-          <span v-if="isAutoApproved(trip)" class="rounded-md bg-white/10 px-2 py-1 font-semibold" title="Avtomatik tasdiqlangan">Avto tasdiqlangan</span>
-          <span v-else-if="trip.monitoringNote" class="truncate rounded-md bg-white/10 px-2 py-1 font-semibold">Monitoring izohi: {{ trip.monitoringNote }}</span>
-          <span class="ml-auto font-mono" :title="trip.id">ID: {{ displayId(trip.id) }}</span>
+      <div class="grid gap-2.5" :class="stats.length === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'">
+        <div v-for="(stat, index) in stats" :key="stat.label" class="rounded-xl px-4 py-3"
+          :class="[index === 0 ? 'bg-mint' : 'bg-canvas', stats.length === 3 && index === 2 ? 'col-span-2 sm:col-span-1' : '']">
+          <p class="flex items-center gap-1.5 text-[11px] font-semibold text-muted"><component :is="stat.icon" :size="13" /> {{ stat.label }}</p>
+          <p class="mt-1 text-lg font-bold tracking-tight" :class="index === 0 ? 'text-forest' : 'text-ink'">{{ stat.value }}</p>
+          <p v-if="stat.sub" class="text-[11px] text-muted">{{ stat.sub }}</p>
         </div>
       </div>
 
-      <!-- Tafsilotlar -->
-      <dl class="grid gap-2.5 sm:grid-cols-2">
-        <div v-for="row in details" :key="row.label" class="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas px-3.5 py-3">
-          <dt class="flex min-w-0 items-center gap-2 text-[11px] font-semibold text-muted"><component :is="row.icon" :size="14" class="shrink-0 text-slate-400" />{{ row.label }}</dt>
-          <dd class="truncate text-xs font-bold text-ink">{{ row.value }}</dd>
-        </div>
-      </dl>
-
-      <!-- Savdo turi va izoh -->
-      <div class="space-y-2.5">
-        <div class="flex items-center justify-between rounded-xl border border-line px-3.5 py-3 text-xs">
-          <span class="font-semibold text-muted">Hisobga yozish</span>
-          <span class="font-bold text-ink">{{ trip.saleType === 'cash' ? 'Naqd — kassaga tushadi' : 'Mijoz balansiga qarz yoziladi' }}</span>
-        </div>
-        <div v-if="trip.note" class="flex items-start gap-2.5 rounded-xl border border-line bg-canvas px-3.5 py-3 text-xs">
-          <StickyNote :size="14" class="mt-0.5 shrink-0 text-slate-400" />
-          <p class="leading-relaxed text-ink"><span class="font-bold">Izoh:</span> {{ trip.note }}</p>
-        </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <PreviewSection title="Yuk va transport" :rows="cargoRows" />
+        <PreviewSection title="Savdo" :rows="saleRows" />
       </div>
 
-      <!-- Fotosurat (preview ichida ochiladi) -->
-      <div v-if="photoOpen" class="space-y-2">
-        <div v-if="photoLoading" class="grid h-[35vh] place-items-center rounded-xl bg-canvas text-xs text-muted">Rasm yuklanmoqda…</div>
-        <img v-else-if="trip.photoUrl" :src="trip.photoUrl" :alt="`Reys ${displayId(trip.id)} yuk surati`"
-          class="max-h-[50vh] w-full rounded-xl bg-canvas object-contain" />
-        <div v-else class="grid h-[24vh] place-items-center rounded-xl bg-canvas px-4 text-center text-xs text-muted">{{ photoError || 'Bu reys uchun rasm biriktirilmagan.' }}</div>
+      <PreviewSection title="Monitoring" :rows="monitoringRows" />
+
+      <div v-if="trip.note" class="flex items-start gap-2.5 rounded-xl border border-line bg-canvas px-4 py-3">
+        <StickyNote :size="15" class="mt-0.5 shrink-0 text-muted" />
+        <p class="text-[13px] leading-relaxed text-ink">{{ trip.note }}</p>
       </div>
+
+      <section v-if="store.hasPhoto(trip)" class="overflow-hidden rounded-xl border border-line">
+        <div class="flex items-center justify-between gap-3 bg-canvas px-4 py-2">
+          <h3 class="text-[11px] font-bold uppercase tracking-wide text-muted">Yuk fotosurati</h3>
+          <button v-if="photoOpen" type="button" class="flex items-center gap-1.5 text-xs font-semibold text-muted transition hover:text-ink" @click="photoOpen = false"><EyeOff :size="14" /> Yashirish</button>
+        </div>
+        <button v-if="!photoOpen" type="button" class="flex w-full items-center justify-center gap-2 border-t border-line py-4 text-sm font-semibold text-leaf transition hover:bg-mint" @click="showPhoto">
+          <ImageIcon :size="16" /> Rasmni ko‘rish
+        </button>
+        <template v-else>
+          <div v-if="photoLoading" class="grid h-48 place-items-center border-t border-line text-xs text-muted">Rasm yuklanmoqda…</div>
+          <a v-else-if="trip.photoUrl" :href="trip.photoUrl" target="_blank" rel="noopener" class="block border-t border-line bg-canvas">
+            <img :src="trip.photoUrl" :alt="`Reys ${tripCode(trip.id)} yuk surati`" class="max-h-[46vh] w-full object-contain" />
+          </a>
+          <div v-else class="flex h-32 flex-col items-center justify-center gap-2 border-t border-line text-xs text-muted"><ImageOff :size="18" />{{ photoError || 'Rasm topilmadi.' }}</div>
+        </template>
+      </section>
 
       <div class="flex items-center justify-between gap-2 border-t border-line pt-3">
-        <button v-if="store.hasPhoto(trip)" class="btn-secondary !py-2 text-xs" type="button" @click="togglePhoto">
-          <ImageIcon :size="15" /> {{ photoOpen ? 'Fotosurati yashirish' : 'Yuk fotosuratini ko‘rish' }}
-        </button>
-        <span v-else class="text-[11px] text-muted">Fotosurat biriktirilmagan</span>
+        <span class="font-mono text-[11px] text-muted" :title="trip.id">ID: {{ displayId(trip.id) }}</span>
         <button class="btn-primary !py-2 text-xs" type="button" @click="emit('update:modelValue', false)">Yopish</button>
       </div>
     </div>

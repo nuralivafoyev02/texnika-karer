@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ClipboardCheck, Search, CircleCheck, CircleAlert, WalletCards, Coins, Undo2, Check } from 'lucide-vue-next'
+import { ClipboardCheck, Search, CircleCheck, CircleAlert, WalletCards, Coins, Undo2, Check, StickyNote } from 'lucide-vue-next'
 import ModalDialog from '../components/ModalDialog.vue'
+import PreviewSection from '../components/PreviewSection.vue'
 import { useQuarryStore } from '../stores/quarry'
-import { dateOnly, dateTime, timeOnly, money, number, displayId } from '../lib/format'
+import { dateOnly, dateTime, timeOnly, money, number, tripCode } from '../lib/format'
 import { isAutoApproved, isPendingMonitoring, monitoringLabel, monitoringTagClass } from '../lib/monitoring'
 
 const store = useQuarryStore()
@@ -39,6 +40,32 @@ const listedTotal = computed(() => (tab.value === 'trips'
   : expenses.value.reduce((sum, tx) => sum + Number(tx.amount || 0), 0)))
 function openTrip(trip) { selected.value = { kind: 'trip', row: trip }; note.value = trip.monitoringNote || '' }
 function openExpense(tx) { selected.value = { kind: 'expense', row: tx }; note.value = tx.monitoringNote || '' }
+// Preview qatorlari: reys yoki xarajat turiga qarab.
+const selectedRows = computed(() => {
+  const item = selected.value
+  if (!item) return []
+  const row = item.row
+  const userName = (id) => (id ? store.users.find((user) => user.id === id)?.fullName ?? '—' : '')
+  const common = [
+    { label: isPendingMonitoring(row) ? 'Bekor qilgan' : 'Tasdiqlagan', value: row.monitoredAt ? userName(row.monitoredBy) : '', sub: row.monitoredAt ? dateTime(row.monitoredAt) : '' },
+  ]
+  if (item.kind === 'trip') {
+    return [
+      { label: 'Samosval', value: store.vehicleName(row.vehicleId) },
+      { label: 'Haydovchi', value: store.driverName(row.driverId) },
+      { label: 'Tosh turi', value: store.materialName(row.materialId) },
+      { label: 'Mijoz', value: store.tripClient(row) },
+      { label: 'Savdo turi', value: row.saleType === 'cash' ? 'Naqd savdo' : 'Qarzga', tag: row.saleType === 'cash' ? 'tag-cash' : 'tag-credit' },
+      ...common,
+    ]
+  }
+  return [
+    { label: 'Hisob', value: row.paymentMethod === 'cash' ? 'Naqd kassa' : 'Bank' },
+    { label: 'Texnika', value: row.vehicleId ? store.vehicleName(row.vehicleId) : '' },
+    { label: 'Xodim', value: row.driverId ? store.driverName(row.driverId) : '' },
+    ...common,
+  ]
+})
 function close() { selected.value = null; note.value = '' }
 // Eski bazada `monitoring_status` ustuni va RPC'lar yo'q bo'lsa, yangi reyslar
 // "tasdiqlangan" deb o'qiladi va navbat hech qachon to'lib kelmaydi. Bu holatni
@@ -140,41 +167,34 @@ async function decide(approved) {
       <footer class="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 text-[10px] text-muted"><span>{{ tab === 'trips' ? trips.length : expenses.length }} ta yozuv ko‘rsatildi</span><span>Jami tasdiqlangan: {{ archivedTrips }} reys · {{ archivedExpenses }} xarajat</span></footer>
     </section>
 
-    <!-- Ixcham preview: qatorga bosilganda asosiy ma'lumotlar + holatga mos bitta amal. -->
-    <ModalDialog :model-value="Boolean(selected)" :title="selected?.kind === 'expense' ? 'Xarajat' : 'Reys'" width="max-w-md" @update:model-value="(value) => { if (!value) close() }">
+    <ModalDialog :model-value="Boolean(selected)"
+      :title="selected ? (selected.kind === 'expense' ? store.categoryLabel(selected.row.category) : `Reys ${tripCode(selected.row.id)}`) : 'Yozuv'"
+      :description="selected ? dateTime(selected.row.createdAt) : ''" width="max-w-md"
+      @update:model-value="(value) => { if (!value) close() }">
       <div v-if="selected" class="space-y-4">
-        <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center justify-between gap-3 rounded-xl bg-canvas px-4 py-3">
           <div>
-            <p class="text-sm font-bold text-ink">{{ selected.kind === 'expense' ? store.categoryLabel(selected.row.category) : `Reys ${displayId(selected.row.id)}` }}</p>
-            <p class="mt-1 text-[11px] text-muted">{{ dateTime(selected.row.createdAt) }}<template v-if="selected.row.monitoredAt"> · oxirgi tasdiqlash {{ dateTime(selected.row.monitoredAt) }}</template></p>
+            <p class="text-[11px] font-semibold text-muted">{{ selected.kind === 'expense' ? 'Chiqim summasi' : 'Og‘irlik' }}</p>
+            <p class="mt-0.5 text-xl font-bold tracking-tight text-ink">
+              <template v-if="selected.kind === 'expense'">{{ store.canSeePrices ? money(selected.row.amount) : 'Yashirilgan' }}</template>
+              <template v-else>{{ number(selected.row.weightTons, 1) }} t</template>
+            </p>
+            <p v-if="selected.kind === 'trip' && store.canSeePrices" class="text-[11px] text-muted">{{ money(selected.row.totalAmount) }}</p>
           </div>
           <span class="tag" :class="monitoringTagClass(selected.row)">{{ monitoringLabel(selected.row) }}</span>
         </div>
-        <dl class="space-y-2 rounded-xl border border-line bg-canvas p-3.5 text-xs">
-          <template v-if="selected.kind === 'trip'">
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Texnika</dt><dd class="font-semibold text-ink">{{ store.vehicleName(selected.row.vehicleId) }}</dd></div>
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Haydovchi</dt><dd class="font-semibold text-ink">{{ store.driverName(selected.row.driverId) }}</dd></div>
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Tosh turi</dt><dd class="font-semibold text-ink">{{ store.materialName(selected.row.materialId) }}</dd></div>
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Og‘irlik</dt><dd class="font-semibold text-ink">{{ number(selected.row.weightTons, 1) }} t</dd></div>
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Mijoz</dt><dd class="font-semibold text-ink">{{ store.tripClient(selected.row) }}</dd></div>
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Savdo turi</dt><dd class="font-semibold text-ink">{{ selected.row.saleType === 'cash' ? 'Naqd savdo' : 'Qarzga' }}</dd></div>
-            <div v-if="store.canSeePrices" class="flex items-center justify-between gap-3 border-t border-line pt-2"><dt class="text-muted">Qiymati</dt><dd class="text-sm font-bold text-ink">{{ money(selected.row.totalAmount) }}</dd></div>
-          </template>
-          <template v-else>
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Yo‘nalish</dt><dd class="font-semibold text-ink">Chiqim</dd></div>
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Hisob</dt><dd class="font-semibold text-ink">{{ selected.row.paymentMethod === 'cash' ? 'Naqd kassa' : 'Bank' }}</dd></div>
-            <div v-if="selected.row.vehicleId" class="flex items-center justify-between gap-3"><dt class="text-muted">Texnika</dt><dd class="font-semibold text-ink">{{ store.vehicleName(selected.row.vehicleId) }}</dd></div>
-            <div v-if="selected.row.driverId" class="flex items-center justify-between gap-3"><dt class="text-muted">Xodim</dt><dd class="font-semibold text-ink">{{ store.driverName(selected.row.driverId) }}</dd></div>
-            <div class="flex items-center justify-between gap-3"><dt class="text-muted">Izoh</dt><dd class="max-w-[200px] truncate text-right font-semibold text-ink">{{ selected.row.note || '—' }}</dd></div>
-            <div v-if="store.canSeePrices" class="flex items-center justify-between gap-3 border-t border-line pt-2"><dt class="text-muted">Summa</dt><dd class="text-sm font-bold text-ink">{{ money(selected.row.amount) }}</dd></div>
-          </template>
-        </dl>
-        <p v-if="selected.row.note && selected.kind === 'trip'" class="rounded-xl border border-canvas bg-canvas px-3 py-2 text-[11px] text-ink">Izoh: {{ selected.row.note }}</p>
+        <PreviewSection :rows="selectedRows" />
+        <div v-if="selected.row.note" class="flex items-start gap-2.5 rounded-xl border border-line bg-canvas px-4 py-3">
+          <StickyNote :size="15" class="mt-0.5 shrink-0 text-muted" />
+          <p class="text-[13px] leading-relaxed text-ink">{{ selected.row.note }}</p>
+        </div>
         <label v-if="store.canApproveMonitoring" class="block"><span class="label">Monitoring izohi (ixtiyoriy)</span><input v-model="note" class="field" placeholder="Masalan: hujjat tekshirildi" /></label>
-        <div v-if="store.canApproveMonitoring" class="flex items-center justify-end gap-2">
-          <button v-if="isPendingMonitoring(selected.row)" class="btn-quiet !text-xs" :disabled="saving" @click="close">Yopish</button>
-          <button v-else class="btn-secondary !py-2.5 text-xs" :disabled="saving || store.monitoringSchema === false" @click="decide(false)"><Undo2 :size="15" /> Tasdiqlashni bekor qilish</button>
-          <button v-if="isPendingMonitoring(selected.row)" class="btn-primary !py-2.5 text-xs" :disabled="saving || store.monitoringSchema === false" @click="decide(true)"><Check :size="15" /> {{ saving ? 'Saqlanmoqda…' : 'Tasdiqlash' }}</button>
+        <div class="flex items-center justify-end gap-2 border-t border-line pt-3">
+          <button class="btn-quiet !text-xs" :disabled="saving" @click="close">Yopish</button>
+          <template v-if="store.canApproveMonitoring">
+            <button v-if="!isPendingMonitoring(selected.row)" class="btn-secondary !py-2.5 text-xs" :disabled="saving || store.monitoringSchema === false" @click="decide(false)"><Undo2 :size="15" /> Tasdiqlashni bekor qilish</button>
+            <button v-else class="btn-primary !py-2.5 text-xs" :disabled="saving || store.monitoringSchema === false" @click="decide(true)"><Check :size="15" /> {{ saving ? 'Saqlanmoqda…' : 'Tasdiqlash' }}</button>
+          </template>
         </div>
       </div>
     </ModalDialog>

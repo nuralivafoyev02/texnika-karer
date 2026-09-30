@@ -66,7 +66,7 @@ onUnmounted(() => {
         <section :class="width" data-modal-panel class="max-h-[calc(100vh-32px)] w-full overflow-y-auto rounded-lg border border-white/50 bg-white shadow-float">
           <header class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-line bg-white/95 px-6 py-5 backdrop-blur">
             <div><h2 class="text-lg font-bold tracking-tight text-ink">{{ title }}</h2><p v-if="description" class="mt-1 text-xs text-muted">{{ description }}</p></div>
-            <button class="btn-quiet !p-2" aria-label="Yopish" @click="close"><X :size="18" /></button>
+            <div class="flex shrink-0 items-center gap-1"><slot name="actions" /><button class="btn-quiet !p-2" aria-label="Yopish" @click="close"><X :size="18" /></button></div>
           </header>
           <div class="px-6 py-5"><slot :close="close" /></div>
         </section>

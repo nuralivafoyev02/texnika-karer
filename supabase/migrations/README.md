@@ -16,6 +16,7 @@
 9. `09_policies_storage_realtime.sql` — RLS policy'lar, grants, storage bucket/policy'lar, realtime publication.
 10. `10_trip_auto_approve.sql` — `trips.create` va `trips.auto_approve` ni ajratish.
 11. `11_superadmin_grants_all.sql` — `roles.grants_all`: to'liq huquqli lavozim yangi ruxsat kalitlarini avtomatik oladi.
+12. `12_transaction_edit_delete.sql` — kvitansiyani tahrirlash/o'chirish: `finance.transactions.edit`, `finance.transactions.delete` va `update_transaction` / `delete_transaction` RPC'lari.
 
 ## Alohida (mavjud bazaga) migratsiyalar
 Baza allaqachon o'rnatilgan bo'lsa, butun fayllarni emas — **kerakli bitta faylni** Run qiling.
@@ -24,6 +25,7 @@ Baza allaqachon o'rnatilgan bo'lsa, butun fayllarni emas — **kerakli bitta fay
 |---|---|
 | `10_trip_auto_approve.sql` | Kiritish va tasdiqlashni ajratish: `trips.auto_approve` ruxsati. Reys monitoringga o'tmaydi, darhol tasdiqlangan bo'lib saqlanadi. |
 | `11_superadmin_grants_all.sql` | **Muhim:** to'liq huquqli lavozim yangi ruxsatlarni avtomatik oladi. Bu migratsiyadan keyin yangi kalit qo'shilsa, superadmin o'ziga o'zi tiklashga majbur bo'lmaydi. |
+| `12_transaction_edit_delete.sql` | Moliyada kvitansiyani tahrirlash va o'chirish (ruxsat bilan). Reysga bog'langan naqd savdo yozuvlari bu yerdan o'zgarmaydi. |
 | `check-monitoring.sql` | Diagnostika (hech narsani o'zgartirmaydi, faqat o'qiydi). |
 | `../grant-full-access.sql` | SUPER_ADMIN roli yaratish / to'liq huquqni tiklash. |
 | `../clear-demo-data.sql` | Demo yozuvlarni tozalash. |

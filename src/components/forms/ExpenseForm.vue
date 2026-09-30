@@ -2,9 +2,9 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { WalletCards } from 'lucide-vue-next'
 import FormActions from './FormActions.vue'
-import { captureAmountInput, parseAmountInput } from '../../lib/format'
+import { captureAmountInput, parseAmountInput, formatAmountInput } from '../../lib/format'
 
-const props = defineProps({ vehicles: { type: Array, default: () => [] }, drivers: { type: Array, default: () => [] }, categories: { type: Array, default: () => [] }, initialCategory: { type: String, default: 'fuel' }, initialDriverId: { type: String, default: '' }, loading: Boolean })
+const props = defineProps({ vehicles: { type: Array, default: () => [] }, drivers: { type: Array, default: () => [] }, categories: { type: Array, default: () => [] }, initialCategory: { type: String, default: 'fuel' }, initialDriverId: { type: String, default: '' }, initial: { type: Object, default: null }, submitLabel: { type: String, default: 'Xarajatni saqlash' }, loading: Boolean })
 const emit = defineEmits(['submit', 'cancel'])
 // Moliya turlari Sozlamalar → Moliya bo‘limida yaratiladi; ro‘yxat bo‘sh bo‘lsa
 // tizim standartlari ko‘rsatiladi.
@@ -17,7 +17,10 @@ const fallbackCategories = [
   { key: 'other', label: 'Boshqa xarajat', hint: 'Boshqa bo‘limlar uchun to‘lov', needsVehicle: false, needsDriver: false },
 ]
 const options = computed(() => (props.categories.length ? props.categories : fallbackCategories))
-const form = reactive({ category: props.initialCategory || 'fuel', amount: '', paymentMethod: 'cash', vehicleId: '', driverId: props.initialDriverId || '', note: '' })
+// `initial` berilsa — mavjud kvitansiyani tahrirlash rejimi.
+const form = reactive(props.initial
+  ? { category: props.initial.category, amount: formatAmountInput(Math.round(Number(props.initial.amount) || 0)), paymentMethod: props.initial.paymentMethod || 'cash', vehicleId: props.initial.vehicleId || '', driverId: props.initial.driverId || '', note: props.initial.note || '' }
+  : { category: props.initialCategory || 'fuel', amount: '', paymentMethod: 'cash', vehicleId: '', driverId: props.initialDriverId || '', note: '' })
 watch(() => props.initialCategory, (value) => { form.category = value || 'fuel' })
 watch(() => props.initialDriverId, (value) => { form.driverId = value || '' })
 const error = ref('')
@@ -51,6 +54,6 @@ const onAmount = (event) => captureAmountInput(event, (value) => { form.amount =
     </div></fieldset>
     <label class="mt-4 block"><span class="label">Izoh</span><input v-model="form.note" class="field" placeholder="Xarajat tafsiloti" /></label>
     <p v-if="error" class="mt-3 text-xs font-semibold text-danger">{{ error }}</p>
-    <FormActions :loading="loading" submit-label="Xarajatni saqlash" @cancel="emit('cancel')" />
+    <FormActions :loading="loading" :submit-label="submitLabel" @cancel="emit('cancel')" />
   </form>
 </template>

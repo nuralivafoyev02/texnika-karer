@@ -2,15 +2,21 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { CircleDollarSign, WalletCards } from 'lucide-vue-next'
 import FormActions from './FormActions.vue'
-import { money, captureAmountInput, parseAmountInput } from '../../lib/format'
+import { money, captureAmountInput, parseAmountInput, formatAmountInput } from '../../lib/format'
 
-const props = defineProps({ clients: { type: Array, default: () => [] }, categories: { type: Array, default: () => [] }, balanceFor: { type: Function, default: () => 0 }, initialClientId: { type: String, default: '' }, loading: Boolean })
+const props = defineProps({ clients: { type: Array, default: () => [] }, categories: { type: Array, default: () => [] }, balanceFor: { type: Function, default: () => 0 }, initialClientId: { type: String, default: '' }, initial: { type: Object, default: null }, submitLabel: { type: String, default: 'To‘lovni saqlash' }, loading: Boolean })
 const emit = defineEmits(['submit', 'cancel'])
 // Daromat turlari Sozlamalar → Moliya bo‘limida yaratiladi; ro‘yxat bo‘sh bo‘lsa
 // tizim standarti (mijoz to‘lovi) qo‘llanadi.
 const fallbackCategories = [{ key: 'customer_payment', label: 'Mijoz to‘lovi', hint: 'Kelgan to‘lov mijoz balansini kamaytiradi', needsClient: true }]
-const options = computed(() => (props.categories.length ? props.categories : fallbackCategories))
-const form = reactive({
+// Naqd savdo reys orqali avtomatik yoziladi — qo'lda tanlanmaydi.
+const options = computed(() => (props.categories.length ? props.categories.filter((item) => item.key !== 'cash_sale') : fallbackCategories))
+// `initial` berilsa — mavjud kvitansiyani tahrirlash rejimi.
+const form = reactive(props.initial ? {
+  clientId: props.initial.clientId || '',
+  amount: formatAmountInput(Math.round(Number(props.initial.amount) || 0)), paymentMethod: props.initial.paymentMethod || 'cash', note: props.initial.note || '',
+  category: props.initial.category,
+} : {
   clientId: props.initialClientId,
   amount: '', paymentMethod: 'cash', note: '',
   category: options.value.find((item) => item.key === 'customer_payment')?.key ?? options.value[0]?.key ?? 'customer_payment',
@@ -53,6 +59,6 @@ const onAmount = (event) => captureAmountInput(event, (value) => { form.amount =
       <label><span class="label">Izoh</span><input v-model="form.note" class="field" placeholder="Masalan, shartnoma bo‘yicha" /></label>
       <p v-if="error" class="text-xs font-semibold text-danger">{{ error }}</p>
     </div>
-    <FormActions :loading="loading" submit-label="To‘lovni saqlash" @cancel="emit('cancel')" />
+    <FormActions :loading="loading" :submit-label="submitLabel" @cancel="emit('cancel')" />
   </form>
 </template>

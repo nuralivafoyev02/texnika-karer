@@ -817,6 +817,28 @@ button:disabled {
   opacity: 0;
 }
 
+/* ── Toast: tepadan tushadi, tepaga chiqib ketadi ─────────────────────────── */
+.toast-enter-active {
+  transition: transform .38s cubic-bezier(.16, 1, .3, 1), opacity .25s ease;
+}
+
+.toast-leave-active {
+  transition: transform .26s cubic-bezier(.7, 0, .84, 0), opacity .22s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(calc(-100% - 28px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter-from,
+  .toast-leave-to {
+    transform: none;
+  }
+}
+
 /* ── Dropdown animatsiyasi ───────────────────────────────────────────────────
    Asosiy animatsiya — haqiqiy balandlik (0px → 100%) va opacity, `grid-template-rows`
    orqali. scale ISHLATILMAYDI: scale faqat ko'rinishni kichiklashtiradi, lekin

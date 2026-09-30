@@ -63,8 +63,10 @@ function retryView() {
         </RouterView>
       </main>
     </div>
-    <Transition name="fade">
-      <div v-if="store.toast" class="fixed bottom-5 right-5 z-[100] flex max-w-[calc(100vw-40px)] items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3 shadow-float">
+    <!-- Toast: yuqori o'ng burchakda, tepadan tushib keladi va tepaga chiqib ketadi.
+         key — yangi xabar kelganda eskisi chiqib, yangisi qaytadan tushadi. -->
+    <Transition name="toast" mode="out-in">
+      <div v-if="store.toast" :key="store.toast.id" role="status" aria-live="polite" class="fixed right-5 top-5 z-[100] flex max-w-[calc(100vw-40px)] items-center gap-3 rounded-2xl border border-line bg-white px-4 py-3 shadow-float">
         <div :class="store.toast.type === 'error' ? 'bg-red-50 text-danger' : 'bg-mint text-leaf'" class="grid h-8 w-8 place-items-center rounded-xl">
           <CircleAlert v-if="store.toast.type === 'error'" :size="17" />
           <Check v-else :size="17" />
