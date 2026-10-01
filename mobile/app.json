@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "AliBuilding",
+    "slug": "alibuilding-mobile",
+    "scheme": "alibuilding",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "backgroundColor": "#F5F7FB",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "uz.alibuilding.erp",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Face ID orqali tizimga tez va xavfsiz kirish uchun.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "uz.alibuilding.erp",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B2F5E",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "CAMERA"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B2F5E",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
+        }
+      ],
+      "expo-updates",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "Face ID orqali tizimga tez va xavfsiz kirish uchun."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Face ID orqali tizimga tez va xavfsiz kirish uchun."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Reys va profil rasmini tanlash uchun galereyaga kirish kerak.",
+          "cameraPermission": "Yuk rasmini olish uchun kameraga kirish kerak.",
+          "microphonePermission": false
+        }
+      ]
+    ]
+  }
+}
